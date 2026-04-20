@@ -1,0 +1,236 @@
+# ===================================
+# Root Level Ignores
+# ===================================
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.class
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.iml
+*.ipr
+*.iws
+
+# Test results and coverage
+test-results/
+coverage/
+*.lcov
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Playwright
+.playwright-cli/
+playwright-report/
+playwright/.cache/
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Temporary markdown files
+context.md
+rules.md
+state.md
+task.md
+
+# Test data files
+*-test.json
+*-login.json
+tmp-*.json
+
+# ===================================
+# Backend (Spring Boot / Maven)
+# ===================================
+
+server/target/
+server/logs/
+server/*.log
+server/*.class
+server/*.jar
+server/*.war
+server/*.ear
+
+# Maven
+server/.mvn/wrapper/maven-wrapper.jar
+server/mvnw
+server/mvnw.cmd
+
+# Spring Boot
+server/spring-boot-*.log
+server/*-dev.log
+server/*-backend.log
+
+# Test outputs
+server/test-output.txt
+server/*-import-run*.log
+
+# Database files
+server/*.db
+server/*.sqlite
+server/*.h2.db
+
+# ===================================
+# Frontend (Next.js Client)
+# ===================================
+
+client/node_modules/
+client/.next/
+client/out/
+client/build/
+client/dist/
+client/.swc/
+client/*.log
+
+# Testing
+client/test-results/
+client/playwright-report/
+client/.playwright/
+
+# Next.js
+client/.next/
+client/out/
+client/next-env.d.ts
+
+# Vercel
+client/.vercel
+
+# ===================================
+# Admin (React / Vite)
+# ===================================
+
+admin/node_modules/
+admin/dist/
+admin/build/
+admin/*.log
+
+# Vite
+admin/dist-ssr/
+admin/*.local
+
+# Testing
+admin/coverage/
+admin/test-results/
+
+# ===================================
+# Node.js (General)
+# ===================================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Package manager lock files (optional - uncomment if needed)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ===================================
+# Database
+# ===================================
+
+*.sql
+*.sqlite
+*.db
+*.db-journal
+
+# ===================================
+# Docker
+# ===================================
+
+docker-compose.override.yml
+.dockerignore
+
+# ===================================
+# Build artifacts
+# ===================================
+
+dist/
+build/
+out/
+target/
+
+# ===================================
+# Miscellaneous
+# ===================================
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Compressed files
+*.7z
+*.dmg
+*.gz
+*.iso
+*.rar
+*.tar
+*.zip
+
+# Cache directories
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# Agent and AI files
+.agent/.shared/*/data/
+.codex/
+
+# Git
+.git/

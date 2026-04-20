@@ -1,0 +1,83 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: ecommerce-backend
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ecommerce_db
+    username: postgres
+    password: 1
+    driver-class-name: org.postgresql.Driver
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 500MB
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+app:
+  message:
+    sms:
+      sender-name: ${SMS_SENDER_NAME:BAGY}
+      smsdev:
+        base-url: ${SMSDEV_BASE_URL:http://localhost:4001}
+  loyalty:
+    points-per-vnd: 1000
+  order:
+    min-amount-for-freeship: 500000
+  shipping:
+    ghn:
+      base-url: https://dev-online-gateway.ghn.vn
+      token: "7154b80d-22ea-11f1-a973-aee5264794df"
+      shop-id: 199629
+      from-district-id: 1542
+      sender-name: "BAGY Hà Nội"
+      sender-phone: "0900000001"
+      sender-address: "7 Khương Hạ"
+      sender-ward-name: "Khương Đình"
+      sender-district-name: "Thanh Xuân"
+      sender-province-name: "Hà Nội"
+  payment:
+    sepay:
+      enabled: ${SEPAY_ENABLED:true}
+      base-url: ${SEPAY_BASE_URL:https://my.dev.sepay.vn}
+      api-token: ${SEPAY_API_TOKEN:BS4W71EWYMMATLOKDLHOBQJ6RK2N0GUOZVOABYS89IRDX9KMCVF3QXFU7DS1PSLC}
+      bank-account-number: ${SEPAY_BANK_ACCOUNT_NUMBER:0346775319}
+      bank-bin: ${SEPAY_BANK_BIN:}
+      bank-code: ${SEPAY_BANK_CODE:MBBank}
+      webhook-secret: ${SEPAY_WEBHOOK_SECRET:+WnBbEmD1fJebk1fWYf0eOPSh+TNLSPdPJ661X1CQtw=}
+      expired-minutes: ${SEPAY_EXPIRED_MINUTES:60}
+      test-amount: ${SEPAY_TEST_AMOUNT:2000}
+  jwt:
+    access-token:
+      secret: "DVXOOH+qixR6qrdtHNJtSYGubP1bi+djivNj2c+CqJcDGZXJnJt3/XvRF1sq/HreSv0b6DHnp3Zof4+1FrSdoQ=="
+      expiration: 3600
+    refresh-token:
+      secret: "JJKSM8KwfOsVnlG3IUiwVRGukLPp2+5xWVxdXUVHvb6Zfs6m8vGYi2sJW0NCQkmmBKTeLSV09ChMxjSBoCk9cw=="
+      expiration: 604800
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+rate-limit:
+  global:
+    capacity: 20
+    refill-tokens: 20
+    refill-period: 1
+
+cloudinary:
+  cloud-name: dmhdv1ykp
+  api-key: 345613951591434
+  api-secret: CKMLH649SlqfC378-efHD7H7IYE
