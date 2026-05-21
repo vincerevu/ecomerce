@@ -20,14 +20,13 @@ export default function UserDropdown() {
         onClick={toggleDropdown}
         className="flex items-center text-gray-700 dropdown-toggle dark:text-gray-400"
       >
-        <span className="mr-3 overflow-hidden rounded-full h-11 w-11">
-          <img src={user?.roles?.includes("ADMIN") ? "/images/user/owner.jpg" : "/images/user/user-01.jpg"} alt="User" />
+        <span className="mr-3 flex h-11 w-11 items-center justify-center rounded-full bg-brand-500 font-bold text-white text-lg dark:bg-brand-600 shadow-sm border border-gray-100 dark:border-gray-800 shrink-0">
+          {(user?.name || "Người dùng").charAt(0).toUpperCase()}
         </span>
 
         <div className="flex flex-col items-start mr-1">
           <span className="block font-semibold text-gray-800 text-theme-sm dark:text-white/90">
-            {user?.name || "Người dùng"}
-          </span>
+            {user?.name || "Người dùng"}</span>
           <span className="block text-theme-xs text-gray-500 dark:text-gray-400">
             {user?.position || "Nhân viên"}
           </span>
