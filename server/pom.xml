@@ -240,7 +240,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>com.spring.ecommerce.EcommerceApplication</mainClass>
+							<mainClass>com.project.ecommerce.EcommerceApplication</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
