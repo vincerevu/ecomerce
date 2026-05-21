@@ -12,6 +12,7 @@ import { buildCartItemFromProduct, Product } from "@/types/product";
 import { getProductBySlug } from "@/libs/catalog-api";
 import SectionLoader from "../Common/SectionLoader";
 import { syncAddCartItem } from "@/libs/cart-sync";
+import { reviewApi, ProductReview, ProductReviewSummary } from "@/libs/review-api";
 
 type ShopDetailsProps = {
   slug: string;
@@ -26,6 +27,8 @@ const ShopDetails = ({ slug }: ShopDetailsProps) => {
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
+  const [reviewSummary, setReviewSummary] = useState<ProductReviewSummary | null>(null);
 
   const getFirstAvailableSize = (colors: Product["colors"], preferredColorName?: string) => {
     const targetColor =
@@ -52,6 +55,12 @@ const ShopDetails = ({ slug }: ShopDetailsProps) => {
         setActiveColor(initialColor?.name || "");
         setActiveSize(getFirstAvailableSize(productData.colors, initialColor?.name));
         setPreviewImg(0);
+        const [reviewsResponse, summaryResponse] = await Promise.all([
+          reviewApi.getByProduct(productData.id).catch(() => null),
+          reviewApi.getSummary(productData.id).catch(() => null),
+        ]);
+        setReviews(reviewsResponse?.result?.data || []);
+        setReviewSummary(summaryResponse?.result || null);
       } catch (loadError) {
         console.error(loadError);
         setError("Không tải được chi tiết sản phẩm.");
@@ -210,6 +219,11 @@ const ShopDetails = ({ slug }: ShopDetailsProps) => {
                 <span className="text-dark-4">
                   Tồn kho: {product.totalStock.toLocaleString("vi-VN")}
                 </span>
+                <span className="text-dark-4">
+                  {reviewSummary?.reviewCount
+                    ? `${(reviewSummary.averageRating || 0).toFixed(1)}/5 từ ${reviewSummary.reviewCount} đánh giá`
+                    : "Chưa có đánh giá"}
+                </span>
               </div>
 
               <h3 className="font-medium text-custom-1 mb-4.5 flex items-end gap-3">
@@ -363,6 +377,46 @@ const ShopDetails = ({ slug }: ShopDetailsProps) => {
                   <li>Chất liệu: {product.material || "Đang cập nhật"}</li>
                 </ul>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-12 rounded-[18px] border border-gray-3 bg-white p-5 sm:p-8">
+            <div className="flex flex-wrap items-end justify-between gap-3 border-b border-gray-3 pb-5">
+              <div>
+                <h3 className="text-2xl font-semibold text-dark">Đánh giá sản phẩm</h3>
+                <p className="mt-1 text-sm text-dark-4">
+                  {reviewSummary?.reviewCount
+                    ? `${reviewSummary.reviewCount} đánh giá đã xác thực`
+                    : "Sản phẩm chưa có đánh giá từ khách đã mua."}
+                </p>
+              </div>
+              {reviewSummary?.reviewCount ? (
+                <div className="rounded-full bg-[#FFF3D7] px-4 py-2 font-semibold text-dark">
+                  {(reviewSummary.averageRating || 0).toFixed(1)}/5
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {reviews.length > 0 ? (
+                reviews.map((review) => (
+                  <div key={review.id} className="rounded-[16px] border border-gray-3 bg-gray-1 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="font-medium text-dark">{review.userName || "Khách hàng"}</p>
+                      <p className="text-sm font-medium text-[#C98700]">
+                        {"★".repeat(review.rating)}{"☆".repeat(5 - review.rating)}
+                      </p>
+                    </div>
+                    {review.comment ? (
+                      <p className="mt-2 text-sm leading-6 text-dark-4">{review.comment}</p>
+                    ) : null}
+                  </div>
+                ))
+              ) : (
+                <p className="rounded-[16px] border border-dashed border-gray-3 px-4 py-8 text-center text-dark-4">
+                  Hãy là người đầu tiên đánh giá sau khi nhận hàng.
+                </p>
+              )}
             </div>
           </div>
         </div>

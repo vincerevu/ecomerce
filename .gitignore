@@ -234,3 +234,16 @@ target/
 
 # Git
 .git/
+
+# Python virtual environments
+.venv/
+venv/
+chatbot/.venv/
+chatbot/venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+chatbot/.pytest_cache/
+chatbot/ecommerce_chatbot.egg-info/

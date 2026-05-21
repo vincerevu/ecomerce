@@ -3,6 +3,7 @@ package com.project.ecommerce.modules.product.controller;
 import com.project.ecommerce.common.dto.response.ApiResponse;
 import com.project.ecommerce.common.dto.response.PageResponse;
 import com.project.ecommerce.modules.product.dto.request.CreateProductRequest;
+import com.project.ecommerce.modules.product.dto.response.ProductListResponse;
 import com.project.ecommerce.modules.product.dto.response.ProductResponse;
 import com.project.ecommerce.modules.product.entity.Product;
 import com.project.ecommerce.modules.product.service.ProductService;
@@ -25,10 +26,10 @@ public class ProductController {
 
     @Operation(summary = "Get all products with dynamic filter + pagination")
     @GetMapping
-    public ApiResponse<PageResponse<ProductResponse>> getProducts(
+    public ApiResponse<PageResponse<ProductListResponse>> getProducts(
             Pageable pageable,
             @Filter Specification<Product> spec) {
-        return ApiResponse.<PageResponse<ProductResponse>>builder()
+        return ApiResponse.<PageResponse<ProductListResponse>>builder()
                 .code(1000).message("Success")
                 .result(productService.getProducts(pageable, spec))
                 .build();

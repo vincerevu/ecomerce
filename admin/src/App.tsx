@@ -10,8 +10,6 @@ import Alerts from "./pages/UiElements/Alerts";
 import Badges from "./pages/UiElements/Badges";
 import Avatars from "./pages/UiElements/Avatars";
 import Buttons from "./pages/UiElements/Buttons";
-import LineChart from "./pages/Charts/LineChart";
-import BarChart from "./pages/Charts/BarChart";
 import Calendar from "./pages/Calendar";
 import BasicTables from "./pages/Tables/BasicTables";
 import FormElements from "./pages/Forms/FormElements";
@@ -35,6 +33,10 @@ import CustomerEditor from "./pages/CustomerEditor";
 import Roles from "./pages/Roles";
 import Permissions from "./pages/Permissions";
 import Categories from "./pages/Categories";
+import Banners from "./pages/Banners";
+import AppSettings from "./pages/AppSettings";
+import Coupons from "./pages/Coupons";
+import Reviews from "./pages/Reviews";
 import CategoryDetails from "./pages/CategoryDetails";
 import CategoryEditor from "./pages/CategoryEditor";
 import Inventory from "./pages/Inventory";
@@ -86,6 +88,10 @@ export default function App() {
               <Route path="/categories/:categoryId" element={withPermission(<CategoryDetails />, "CATEGORY:VIEW")} />
               <Route path="/categories/new" element={withPermission(<CategoryEditor />, "CATEGORY:CREATE")} />
               <Route path="/categories/:categoryId/edit" element={withPermission(<CategoryEditor />, "CATEGORY:UPDATE")} />
+              <Route path="/banners" element={<Banners />} />
+              <Route path="/coupons" element={withPermission(<Coupons />, "COUPON:VIEW")} />
+              <Route path="/reviews" element={withPermission(<Reviews />, "REVIEW:VIEW")} />
+              <Route path="/app-settings" element={withPermission(<AppSettings />, "__ADMIN_ONLY__")} />
               <Route path="/inventory" element={withPermission(<Inventory />, "INVENTORY:VIEW")} />
               <Route path="/team" element={withPermission(<Team />, "USER:VIEW")} />
               <Route path="/team/:staffId" element={withPermission(<TeamDetails />, "USER:VIEW")} />
@@ -103,8 +109,6 @@ export default function App() {
               <Route path="/images" element={<Images />} />
               <Route path="/videos" element={<Videos />} />
 
-              <Route path="/line-chart" element={<LineChart />} />
-              <Route path="/bar-chart" element={<BarChart />} />
             </Route>
           </Route>
 

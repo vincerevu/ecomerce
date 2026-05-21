@@ -52,7 +52,20 @@ public enum ErrorCode {
     ORDER_PAYMENT_NOT_ALLOWED(1037, "Order is not available for payment", HttpStatus.BAD_REQUEST),
     ORDER_PAYMENT_EXPIRED(1038, "Payment window for this order has expired", HttpStatus.BAD_REQUEST),
     ORDER_CANNOT_BE_CANCELLED(1039, "Order cannot be cancelled", HttpStatus.BAD_REQUEST),
-    COLLECTION_SLUG_ALREADY_EXISTS(1040, "Collection slug already exists", HttpStatus.CONFLICT);
+    COLLECTION_SLUG_ALREADY_EXISTS(1040, "Collection slug already exists", HttpStatus.CONFLICT),
+    COUPON_NOT_FOUND(1041, "Coupon not found", HttpStatus.NOT_FOUND),
+    COUPON_CODE_ALREADY_EXISTS(1042, "Coupon code already exists", HttpStatus.CONFLICT),
+    COUPON_INACTIVE(1043, "Coupon is inactive", HttpStatus.BAD_REQUEST),
+    COUPON_NOT_STARTED(1044, "Coupon is not active yet", HttpStatus.BAD_REQUEST),
+    COUPON_EXPIRED(1045, "Coupon has expired", HttpStatus.BAD_REQUEST),
+    COUPON_USAGE_LIMIT_REACHED(1046, "Coupon usage limit reached", HttpStatus.BAD_REQUEST),
+    COUPON_MIN_ORDER_NOT_MET(1047, "Order does not meet coupon minimum amount", HttpStatus.BAD_REQUEST),
+    REVIEW_NOT_FOUND(1048, "Review not found", HttpStatus.NOT_FOUND),
+    REVIEW_NOT_ALLOWED(1049, "You can only review delivered products you purchased", HttpStatus.BAD_REQUEST),
+    REVIEW_ALREADY_EXISTS(1050, "You already reviewed this product for this order", HttpStatus.CONFLICT),
+    COUPON_NOT_APPLICABLE(1051, "Coupon is not applicable for this customer", HttpStatus.BAD_REQUEST),
+    COUPON_TARGET_REQUIRED(1052, "Coupon target is required", HttpStatus.BAD_REQUEST),
+    INSUFFICIENT_STOCK(1053, "Insufficient stock for this product", HttpStatus.CONFLICT);
 
     private int code;
     private String message;

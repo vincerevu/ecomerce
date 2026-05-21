@@ -13,6 +13,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ public class RoleService {
 
     @PreAuthorize("hasAuthority('ROLE:CREATE')")
     @Transactional
+    @CacheEvict(value = {"roles", "permissions"}, allEntries = true)
     public RoleResponse createRole(CreateRoleRequest request) {
         if (roleRepository.existsByNameAndIsDeletedFalse(request.getName())) {
             throw new AppException(ErrorCode.INVALID_KEY);
@@ -54,6 +57,7 @@ public class RoleService {
     }
 
     @PreAuthorize("hasAuthority('ROLE:VIEW')")
+    @Cacheable(value = "roles", key = "'all'")
     public List<RoleResponse> getAllRoles() {
         return roleRepository.findAllByIsDeletedFalse()
                 .stream()
@@ -62,6 +66,7 @@ public class RoleService {
     }
 
     @PreAuthorize("hasAuthority('ROLE:VIEW')")
+    @Cacheable(value = "roles", key = "'name_' + #name")
     public RoleResponse getRoleById(String name) {
         Role role = roleRepository.findByNameAndIsDeletedFalse(name)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -70,6 +75,7 @@ public class RoleService {
 
     @PreAuthorize("hasAuthority('ROLE:UPDATE')")
     @Transactional
+    @CacheEvict(value = {"roles", "permissions"}, allEntries = true)
     public RoleResponse updateRole(String name, CreateRoleRequest request) {
         Role role = roleRepository.findByNameAndIsDeletedFalse(name)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -87,6 +93,7 @@ public class RoleService {
 
     @PreAuthorize("hasAuthority('ROLE:DELETE')")
     @Transactional
+    @CacheEvict(value = {"roles", "permissions"}, allEntries = true)
     public void deleteRole(String name) {
         Role role = roleRepository.findByNameAndIsDeletedFalse(name)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));

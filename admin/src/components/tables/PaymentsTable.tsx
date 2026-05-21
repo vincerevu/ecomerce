@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { PaymentRecord } from "../../api/paymentApi";
 import { paymentApi } from "../../api/paymentApi";
 import { useAuth } from "../../context/AuthContext";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 import { EyeIcon, PlusIcon, TrashBinIcon } from "../../icons";
 import { showError, showSuccess } from "../../utils/toast";
 import { hasAnyPermission } from "../auth/PermissionGuard";
@@ -26,7 +27,7 @@ import {
   type PaymentSortPreset,
 } from "./paymentTable.utils";
 
-const PAGE_SIZE = 8;
+const DEFAULT_PAGE_SIZE = 8;
 
 interface PaymentsTableProps {
   onCreate?: () => void;
@@ -106,6 +107,7 @@ export default function PaymentsTable({ onCreate, onView }: PaymentsTableProps) 
   const [typeFilter, setTypeFilter] = useState("");
   const [sortPreset, setSortPreset] = useState<PaymentSortPreset>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useStoredPageSize("admin.payments.pageSize", DEFAULT_PAGE_SIZE);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
 
@@ -133,7 +135,7 @@ export default function PaymentsTable({ onCreate, onView }: PaymentsTableProps) 
                 : "createdAt,desc";
       const paymentResponse = await paymentApi.getPayments({
         page: Math.max(0, page - 1),
-        size: PAGE_SIZE,
+        size: pageSize,
         sort,
         ...(filter ? { filter } : {}),
       });
@@ -164,11 +166,11 @@ export default function PaymentsTable({ onCreate, onView }: PaymentsTableProps) 
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, statusFilter, providerFilter, typeFilter, sortPreset]);
+  }, [debouncedSearchTerm, statusFilter, providerFilter, typeFilter, sortPreset, pageSize]);
 
   useEffect(() => {
     void loadPayments(currentPage);
-  }, [currentPage, debouncedSearchTerm, statusFilter, providerFilter, typeFilter, sortPreset]);
+  }, [currentPage, debouncedSearchTerm, statusFilter, providerFilter, typeFilter, sortPreset, pageSize]);
 
   const safePage = Math.min(currentPage, totalPages);
   const hasFilters = Boolean(searchTerm || statusFilter || providerFilter || typeFilter);
@@ -377,10 +379,15 @@ export default function PaymentsTable({ onCreate, onView }: PaymentsTableProps) 
           currentPage={safePage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setCurrentPage(1);
+          }}
           summary={
             totalElements > 0
-              ? `Hiển thị ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(
-                  safePage * PAGE_SIZE,
+              ? `Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(
+                  safePage * pageSize,
                   totalElements,
                 )} trong ${totalElements} giao dịch`
               : "Không có kết quả"

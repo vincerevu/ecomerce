@@ -34,8 +34,10 @@ public class CreateOrderRequest {
     String notes;
     OrderStatus status;
     PaymentStatus paymentStatus;
+    String paymentMethod;
     BigDecimal shippingFee;
     BigDecimal discountAmount;
+    String couponCode;
 
     @Valid
     @NotEmpty(message = "FIELD_REQUIRED")

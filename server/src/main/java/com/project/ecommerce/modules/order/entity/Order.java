@@ -89,6 +89,10 @@ public class Order extends BaseEntity<String> {
     @Column(nullable = false)
     BigDecimal discountAmount;
 
+    String couponCode;
+
+    String couponName;
+
     @Column(nullable = false)
     BigDecimal totalAmount;
 

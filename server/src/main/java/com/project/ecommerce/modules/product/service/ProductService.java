@@ -5,6 +5,8 @@ import com.project.ecommerce.common.exceptions.AppException;
 import com.project.ecommerce.common.exceptions.ErrorCode;
 import com.project.ecommerce.modules.product.dto.request.CreateProductRequest;
 import com.project.ecommerce.modules.product.dto.request.ColorRequest;
+import com.project.ecommerce.modules.product.dto.response.ProductColorSummaryResponse;
+import com.project.ecommerce.modules.product.dto.response.ProductListResponse;
 import com.project.ecommerce.modules.product.dto.response.ProductResponse;
 import com.project.ecommerce.modules.product.entity.*;
 import com.project.ecommerce.modules.product.mapper.ProductColorMapper;
@@ -17,15 +19,20 @@ import com.project.ecommerce.modules.product.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -40,30 +47,50 @@ public class ProductService {
     private final ProductColorMapper productColorMapper;
 
     @Transactional(readOnly = true)
-    public PageResponse<ProductResponse> getProducts(Pageable pageable, Specification<Product> spec) {
-        Page<Product> productPage = productRepository.findAll(spec, pageable);
-        return PageResponse.<ProductResponse>builder()
-                .currentPage(pageable.getPageNumber())
-                .pageSize(pageable.getPageSize())
+    public PageResponse<ProductListResponse> getProducts(Pageable pageable, Specification<Product> spec) {
+        Pageable effectivePageable = pageable.getSort().isSorted()
+                ? pageable
+                : PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<Product> productPage = productRepository.findAll(spec, effectivePageable);
+        List<ProductListResponse> products = buildProductListResponses(productPage.getContent());
+        return PageResponse.<ProductListResponse>builder()
+                .currentPage(effectivePageable.getPageNumber())
+                .pageSize(effectivePageable.getPageSize())
                 .totalPages(productPage.getTotalPages())
                 .totalElements(productPage.getTotalElements())
                 .last(productPage.isLast())
-                .data(productPage.getContent().stream().map(productMapper::toResponse).toList())
+                .data(products)
                 .build();
     }
 
     @Transactional(readOnly = true)
     public ProductResponse getProductById(String id) {
-        Product product = productRepository.findOneById(id)
+        Product product = productRepository.findDetailById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
         return productMapper.toResponse(product);
     }
 
     @Transactional(readOnly = true)
     public ProductResponse getProductBySlug(String slug) {
-        Product product = productRepository.findOneBySlug(slug)
+        Product product = productRepository.findDetailBySlug(slug)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
         return productMapper.toResponse(product);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductResponse> getProductDetailsByIds(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+
+        Map<String, Product> productsById = productRepository.findDetailsByIds(ids).stream()
+                .collect(Collectors.toMap(Product::getId, Function.identity()));
+
+        return ids.stream()
+                .map(productsById::get)
+                .filter(Objects::nonNull)
+                .map(productMapper::toResponse)
+                .toList();
     }
 
     @Transactional
@@ -204,5 +231,99 @@ public class ProductService {
         if (slugExists) {
             throw new AppException(ErrorCode.PRODUCT_SLUG_ALREADY_EXISTS);
         }
+    }
+
+    private List<ProductListResponse> buildProductListResponses(List<Product> pagedProducts) {
+        if (pagedProducts.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> ids = pagedProducts.stream()
+                .map(Product::getId)
+                .toList();
+
+        Map<String, ProductRepository.ProductListBaseView> baseById = productRepository.findListBaseByIds(ids)
+                .stream()
+                .collect(Collectors.toMap(ProductRepository.ProductListBaseView::getId, Function.identity()));
+
+        Map<String, List<ProductColorSummaryResponse>> colorsByProductId = productRepository
+                .findColorSummariesByProductIds(ids)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ProductRepository.ProductColorSummaryView::getProductId,
+                        Collectors.mapping(this::toColorSummaryResponse, Collectors.toList())));
+
+        Map<String, ProductRepository.ProductPriceStockView> priceStockByProductId = productRepository
+                .findPriceStockByProductIds(ids)
+                .stream()
+                .collect(Collectors.toMap(ProductRepository.ProductPriceStockView::getProductId, Function.identity()));
+
+        Map<String, String> thumbnailByProductId = new LinkedHashMap<>();
+        productRepository.findThumbnailCandidatesByProductIds(ids).forEach(candidate -> {
+            if (candidate.getImageUrl() != null && !candidate.getImageUrl().isBlank()) {
+                thumbnailByProductId.putIfAbsent(candidate.getProductId(), candidate.getImageUrl());
+            }
+        });
+
+        return ids.stream()
+                .map(id -> toProductListResponse(
+                        baseById.get(id),
+                        colorsByProductId.getOrDefault(id, List.of()),
+                        priceStockByProductId.get(id),
+                        thumbnailByProductId.get(id)))
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private ProductListResponse toProductListResponse(
+            ProductRepository.ProductListBaseView base,
+            List<ProductColorSummaryResponse> colors,
+            ProductRepository.ProductPriceStockView priceStock,
+            String thumbnailUrl) {
+        if (base == null) {
+            return null;
+        }
+
+        BigDecimal displayPrice = priceStock != null ? priceStock.getDisplayPrice() : BigDecimal.ZERO;
+        BigDecimal minOriginalPrice = priceStock != null ? priceStock.getMinOriginalPrice() : BigDecimal.ZERO;
+        BigDecimal displayOriginalPrice = minOriginalPrice != null
+                && displayPrice != null
+                && minOriginalPrice.compareTo(displayPrice) > 0
+                        ? minOriginalPrice
+                        : null;
+        Integer totalStock = priceStock != null && priceStock.getTotalStock() != null
+                ? priceStock.getTotalStock().intValue()
+                : 0;
+        Integer variantCount = priceStock != null && priceStock.getVariantCount() != null
+                ? priceStock.getVariantCount().intValue()
+                : 0;
+
+        return ProductListResponse.builder()
+                .id(base.getId())
+                .name(base.getName())
+                .slug(base.getSlug())
+                .shortDescription(base.getShortDescription())
+                .categoryId(base.getCategoryId())
+                .categoryName(base.getCategoryName())
+                .categorySlug(base.getCategorySlug())
+                .thumbnailUrl(thumbnailUrl)
+                .minOriginalPrice(minOriginalPrice)
+                .minSalePrice(displayPrice)
+                .displayPrice(displayPrice)
+                .displayOriginalPrice(displayOriginalPrice)
+                .totalStock(totalStock)
+                .variantCount(variantCount)
+                .status(base.getStatus())
+                .createdAt(base.getCreatedAt())
+                .colors(colors)
+                .build();
+    }
+
+    private ProductColorSummaryResponse toColorSummaryResponse(ProductRepository.ProductColorSummaryView view) {
+        return ProductColorSummaryResponse.builder()
+                .id(view.getId())
+                .colorName(view.getColorName())
+                .hexCode(view.getHexCode())
+                .build();
     }
 }

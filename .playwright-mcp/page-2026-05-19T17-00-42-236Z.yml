@@ -1,0 +1,28 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - link "Quay lại trang chủ" [ref=e7] [cursor=pointer]:
+      - /url: /
+      - img [ref=e8]
+      - text: Quay lại trang chủ
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - heading "Đăng nhập Hệ thống" [level=1] [ref=e13]
+        - paragraph [ref=e14]: Sử dụng Số điện thoại hoặc Email để đăng nhập.
+      - generic [ref=e16]:
+        - generic [ref=e17]:
+          - generic [ref=e18]: Số điện thoại / Email *
+          - textbox "Nhập số điện thoại hoặc email" [ref=e20]
+        - generic [ref=e21]:
+          - generic [ref=e22]: Mật khẩu *
+          - generic [ref=e23]:
+            - textbox "Nhập mật khẩu" [ref=e25]
+            - img [ref=e27] [cursor=pointer]
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - checkbox [ref=e33] [cursor=pointer]
+            - generic [ref=e34]: Ghi nhớ đăng nhập
+          - link "Quên mật khẩu?" [ref=e35] [cursor=pointer]:
+            - /url: /forgot-password
+        - button "Đăng nhập" [ref=e37] [cursor=pointer]
+  - button [ref=e39] [cursor=pointer]:
+    - img [ref=e40]

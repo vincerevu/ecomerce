@@ -33,7 +33,7 @@ public class ApplicationInitConfig {
             // 1. Initialize Permissions
             String[] commonActions = { "VIEW", "CREATE", "UPDATE", "DELETE" };
             String[] resources = { "USER", "ROLE", "PERMISSION", "PRODUCT", "COLLECTION", "CATEGORY", "TAG", "ORDER", "PAYMENT", "REPORT",
-                    "MEMBERSHIP_TIER", "INVENTORY", "SHIPMENT" };
+                    "MEMBERSHIP_TIER", "INVENTORY", "SHIPMENT", "COUPON", "REVIEW" };
 
             for (String resource : resources) {
                 for (String action : commonActions) {

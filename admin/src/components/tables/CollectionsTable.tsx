@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { collectionApi, type CollectionRecord } from "../../api/collectionApi";
 import { useAuth } from "../../context/AuthContext";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 import { EyeIcon, PlusIcon, TrashBinIcon } from "../../icons";
 import { showError, showSuccess } from "../../utils/toast";
 import { hasAnyPermission } from "../auth/PermissionGuard";
@@ -18,7 +19,7 @@ interface CollectionsTableProps {
   onCreate?: () => void;
 }
 
-const PAGE_SIZE = 8;
+const DEFAULT_PAGE_SIZE = 8;
 const STATUS_OPTIONS: Option[] = [
   { value: "", label: "Tất cả trạng thái" },
   { value: "true", label: "Đang hiển thị" },
@@ -67,6 +68,7 @@ export default function CollectionsTable({ onView, onCreate }: CollectionsTableP
   const [statusFilter, setStatusFilter] = useState("");
   const [sortPreset, setSortPreset] = useState<SortPreset>("sortOrderAsc");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useStoredPageSize("admin.collections.pageSize", DEFAULT_PAGE_SIZE);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -101,7 +103,7 @@ export default function CollectionsTable({ onView, onCreate }: CollectionsTableP
 
         const response = await collectionApi.getPage({
           page: Math.max(0, currentPage - 1),
-          size: PAGE_SIZE,
+          size: pageSize,
           sort,
           ...(filter ? { filter } : {}),
         });
@@ -123,7 +125,7 @@ export default function CollectionsTable({ onView, onCreate }: CollectionsTableP
     };
 
     void loadCollections();
-  }, [currentPage, debouncedSearchTerm, reloadKey, sortPreset, statusFilter]);
+  }, [currentPage, debouncedSearchTerm, pageSize, reloadKey, sortPreset, statusFilter]);
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -319,9 +321,14 @@ export default function CollectionsTable({ onView, onCreate }: CollectionsTableP
           currentPage={safePage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setCurrentPage(1);
+          }}
           summary={
             totalElements > 0
-              ? `Hiển thị ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(safePage * PAGE_SIZE, totalElements)} trong ${totalElements} bộ sưu tập`
+              ? `Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, totalElements)} trong ${totalElements} bộ sưu tập`
               : "Không có kết quả"
           }
         />

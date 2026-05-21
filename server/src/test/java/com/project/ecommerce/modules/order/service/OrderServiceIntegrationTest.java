@@ -1,7 +1,10 @@
 package com.project.ecommerce.modules.order.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.project.ecommerce.common.exceptions.AppException;
+import com.project.ecommerce.common.exceptions.ErrorCode;
 import com.project.ecommerce.modules.identity.entity.User;
 import com.project.ecommerce.modules.identity.enums.UserType;
 import com.project.ecommerce.modules.identity.repository.UserRepository;
@@ -94,8 +97,39 @@ class OrderServiceIntegrationTest {
         assertThat(loaded.getItems().get(0).getColorName()).isEqualTo("Nau");
         assertThat(loaded.getItems().get(0).getSizeName()).isEqualTo("M");
         assertThat(loaded.getSubtotal()).isEqualByComparingTo("598000");
-        assertThat(loaded.getTotalAmount()).isEqualByComparingTo("618000");
+        assertThat(loaded.getTotalAmount()).isEqualByComparingTo("628000");
         assertThat(loaded.getItemCount()).isEqualTo(1);
+
+        ProductVariant reservedVariant = productVariantRepository.findById(variant.getId()).orElseThrow();
+        assertThat(reservedVariant.getStockQuantity()).isEqualTo(10);
+    }
+
+    @Test
+    @Transactional
+    @WithMockUser(authorities = { "ORDER:CREATE" })
+    void createOrder_shouldRejectWhenVariantStockIsInsufficient() {
+        ProductVariant variant = createVariantProduct("Ao khoac ngan", "ao-khoac-ngan", "Xanh", "S", 399000);
+        variant.setStockQuantity(1);
+        productVariantRepository.saveAndFlush(variant);
+
+        OrderItemRequest itemRequest = new OrderItemRequest();
+        itemRequest.setProductVariantId(variant.getId());
+        itemRequest.setProductId(variant.getProductColor().getProduct().getId());
+        itemRequest.setProductName("Ao khoac ngan");
+        itemRequest.setQuantity(2);
+        itemRequest.setUnitPrice(BigDecimal.valueOf(399000));
+
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setCustomerName("Stock Test");
+        request.setCustomerPhone("0900008888");
+        request.setStatus(OrderStatus.PENDING);
+        request.setPaymentStatus(PaymentStatus.UNPAID);
+        request.setItems(List.of(itemRequest));
+
+        assertThatThrownBy(() -> orderService.create(request))
+                .isInstanceOf(AppException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.INSUFFICIENT_STOCK);
     }
 
     @Test

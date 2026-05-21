@@ -20,6 +20,7 @@ type CustomDropdownProps = {
   optionClassName?: string;
   disabled?: boolean;
   searchable?: boolean;
+  menuPlacement?: "top" | "bottom";
 };
 
 const normalizeSearchValue = (value: string) =>
@@ -43,6 +44,7 @@ const CustomDropdown = ({
   optionClassName = "",
   disabled = false,
   searchable = false,
+  menuPlacement = "bottom",
 }: CustomDropdownProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -120,7 +122,9 @@ const CustomDropdown = ({
 
       {isOpen && (
         <div
-          className={`component-scrollbar absolute left-0 top-[calc(100%+8px)] z-40 max-h-72 w-full overflow-y-auto rounded-[28px] border border-gray-3 bg-white p-2 shadow-lg ${menuClassName}`}
+          className={`component-scrollbar absolute left-0 z-40 max-h-72 w-full overflow-y-auto rounded-[28px] border border-gray-3 bg-white p-2 shadow-lg ${
+            menuPlacement === "top" ? "bottom-[calc(100%+8px)]" : "top-[calc(100%+8px)]"
+          } ${menuClassName}`}
         >
           {searchable && (
             <div className="sticky top-0 z-10 bg-white px-1 pb-2">

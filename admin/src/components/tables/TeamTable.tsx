@@ -4,6 +4,7 @@ import { EyeIcon, PlusIcon, TrashBinIcon } from "../../icons";
 import { showError, showSuccess } from "../../utils/toast";
 import { useAuth } from "../../context/AuthContext";
 import { hasAnyPermission } from "../auth/PermissionGuard";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 import Loader from "../common/Loader";
 import Pagination from "../common/Pagination";
 import SortDropdown, { type SortDropdownOption } from "../common/SortDropdown";
@@ -105,7 +106,7 @@ function Avatar({ name, index }: { name: string; index: number }) {
     return <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${gradient} text-sm font-bold text-white shadow-sm`}>{name?.[0]?.toUpperCase() || "?"}</div>;
 }
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 type TeamSortPreset = "" | "createdAtDesc" | "createdAtAsc" | "nameAsc" | "nameDesc" | "positionAsc" | "positionDesc";
 
 const TEAM_SORT_OPTIONS: SortDropdownOption[] = [
@@ -123,6 +124,7 @@ export default function TeamTable({ onView, onCreate }: TeamTableProps) {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useStoredPageSize("admin.team.pageSize", DEFAULT_PAGE_SIZE);
     const [totalPages, setTotalPages] = useState(1);
     const [totalElements, setTotalElements] = useState(0);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -141,7 +143,7 @@ export default function TeamTable({ onView, onCreate }: TeamTableProps) {
     useEffect(() => {
         const timer = setTimeout(() => { void fetchStaff(currentPage); }, 400);
         return () => clearTimeout(timer);
-    }, [currentPage, searchTerm, positionFilter, sortField, sortOrder]);
+    }, [currentPage, searchTerm, positionFilter, sortField, sortOrder, pageSize]);
 
     const fetchPositions = async () => {
         try {
@@ -161,7 +163,7 @@ export default function TeamTable({ onView, onCreate }: TeamTableProps) {
             if (positionFilter) filterParts.push(`position : '${positionFilter}'`);
             const filter = filterParts.length ? `&filter=${encodeURIComponent(filterParts.join(" and "))}` : "";
             const sort = sortField ? `&sort=${sortField},${sortOrder}` : "";
-            const res = await apiClient.get(`/users/staff?page=${page - 1}&size=${PAGE_SIZE}${filter}${sort}`);
+            const res = await apiClient.get(`/users/staff?page=${page - 1}&size=${pageSize}${filter}${sort}`);
             const result = res.data.result;
             setStaffList(result.data || []);
             setTotalPages(result.totalPages || 1);
@@ -316,7 +318,12 @@ export default function TeamTable({ onView, onCreate }: TeamTableProps) {
                             currentPage={currentPage}
                             totalPages={totalPages}
                             onPageChange={setCurrentPage}
-                            summary={totalElements > 0 ? `Hiển thị ${(currentPage - 1) * PAGE_SIZE + 1}-${Math.min(currentPage * PAGE_SIZE, totalElements)} trong tổng số ${totalElements} thành viên` : "Không có thành viên nào"}
+                            pageSize={pageSize}
+                            onPageSizeChange={(nextPageSize) => {
+                                setPageSize(nextPageSize);
+                                setCurrentPage(1);
+                            }}
+                            summary={totalElements > 0 ? `Hiển thị ${(currentPage - 1) * pageSize + 1}-${Math.min(currentPage * pageSize, totalElements)} trong tổng số ${totalElements} thành viên` : "Không có thành viên nào"}
                         />
                     </>
                 )}

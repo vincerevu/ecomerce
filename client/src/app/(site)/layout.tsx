@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
+import { Toaster } from "react-hot-toast";
 import "../css/euclid-circular-a-font.css";
 import "../css/style.css";
 import Header from "../../components/Header";
@@ -45,6 +46,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body suppressHydrationWarning={true}>
+        <Toaster position="bottom-right" />
         {loading ? (
           <PreLoader />
         ) : (

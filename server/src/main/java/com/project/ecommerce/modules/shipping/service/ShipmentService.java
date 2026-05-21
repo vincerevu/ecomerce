@@ -32,10 +32,14 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -61,13 +65,24 @@ public class ShipmentService {
     @PreAuthorize("hasAuthority('SHIPMENT:VIEW')")
     public PageResponse<ShipmentResponse> getShipments(Pageable pageable, Specification<Shipment> spec) {
         Page<Shipment> shipmentPage = shipmentRepository.findAll(spec, pageable);
+        List<String> shipmentIds = shipmentPage.getContent().stream()
+                .map(Shipment::getId)
+                .toList();
+        Map<String, Shipment> shipmentById = shipmentRepository.findDetailsByIds(shipmentIds)
+                .stream()
+                .collect(Collectors.toMap(Shipment::getId, Function.identity()));
+        Map<String, List<ShipmentEventResponse>> eventsByShipmentId = findEventResponsesByShipmentId(shipmentIds);
         return PageResponse.<ShipmentResponse>builder()
                 .currentPage(pageable.getPageNumber())
                 .pageSize(pageable.getPageSize())
                 .totalPages(shipmentPage.getTotalPages())
                 .totalElements(shipmentPage.getTotalElements())
                 .last(shipmentPage.isLast())
-                .data(shipmentPage.getContent().stream().map(this::toResponse).toList())
+                .data(shipmentIds.stream()
+                        .map(shipmentById::get)
+                        .filter(java.util.Objects::nonNull)
+                        .map(shipment -> toResponse(shipment, eventsByShipmentId.getOrDefault(shipment.getId(), List.of())))
+                        .toList())
                 .build();
     }
 
@@ -80,7 +95,7 @@ public class ShipmentService {
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('SHIPMENT:VIEW')")
     public ShipmentResponse getByOrderId(String orderId) {
-        Shipment shipment = shipmentRepository.findByOrderId(orderId)
+        Shipment shipment = shipmentRepository.findByOrderIdWithOrder(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.SHIPMENT_NOT_FOUND));
         return toResponse(shipment);
     }
@@ -102,21 +117,25 @@ public class ShipmentService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "shipping_services", key = "'from_' + #request.fromDistrictId + '_to_' + #request.toDistrictId")
     public List<ShippingServiceOptionResponse> getAvailableServices(AvailableShippingServiceRequest request) {
         return ghnClient.getAvailableServices(request.getFromDistrictId(), request.getToDistrictId());
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "shipping_locations", key = "'provinces'")
     public List<ShippingAddressOptionResponse> getProvinces() {
         return ghnClient.getProvinces();
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "shipping_locations", key = "'districts_' + #provinceId")
     public List<ShippingAddressOptionResponse> getDistricts(Integer provinceId) {
         return ghnClient.getDistricts(provinceId);
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "shipping_locations", key = "'wards_' + #districtId")
     public List<ShippingAddressOptionResponse> getWards(Integer districtId) {
         return ghnClient.getWards(districtId);
     }
@@ -381,18 +400,34 @@ public class ShipmentService {
     }
 
     private Shipment findShipment(String id) {
-        return shipmentRepository.findById(id)
+        return shipmentRepository.findDetailById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.SHIPMENT_NOT_FOUND));
     }
 
     private ShipmentResponse toResponse(Shipment shipment) {
-        ShipmentResponse response = shipmentMapper.toResponse(shipment);
-        List<ShipmentEventResponse> events = shipmentEventRepository.findAllByShipmentIdOrderByEventTimeDesc(shipment.getId())
+        return toResponse(shipment, shipmentEventRepository.findAllByShipmentIdOrderByEventTimeDesc(shipment.getId())
                 .stream()
                 .map(shipmentEventMapper::toResponse)
-                .toList();
+                .toList());
+    }
+
+    private ShipmentResponse toResponse(Shipment shipment, List<ShipmentEventResponse> events) {
+        ShipmentResponse response = shipmentMapper.toResponse(shipment);
         response.setEvents(events);
         return response;
+    }
+
+    private Map<String, List<ShipmentEventResponse>> findEventResponsesByShipmentId(List<String> shipmentIds) {
+        if (shipmentIds.isEmpty()) {
+            return Map.of();
+        }
+
+        return shipmentEventRepository.findAllByShipmentIdInOrderByEventTimeDesc(shipmentIds)
+                .stream()
+                .sorted(Comparator.comparing(ShipmentEvent::getEventTime, Comparator.nullsLast(Comparator.reverseOrder())))
+                .collect(Collectors.groupingBy(
+                        event -> event.getShipment().getId(),
+                        Collectors.mapping(shipmentEventMapper::toResponse, Collectors.toList())));
     }
 
     private String resolveClientOrderCode(Order order, String requestedCode) {

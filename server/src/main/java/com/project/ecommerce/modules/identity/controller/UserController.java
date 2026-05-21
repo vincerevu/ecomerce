@@ -1,6 +1,5 @@
 package com.project.ecommerce.modules.identity.controller;
 
-import com.cloudinary.Api;
 import com.project.ecommerce.common.dto.response.ApiResponse;
 import com.project.ecommerce.modules.identity.dto.request.CreateUserRequest;
 import com.project.ecommerce.modules.identity.dto.request.UpdateUserProfileRequest;

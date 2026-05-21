@@ -52,5 +52,10 @@ public class Product extends BaseEntity<String> {
     private Set<Tag> tags = new HashSet<>();
 
     @Column(nullable = false)
+    @Builder.Default
     String status = "ACTIVE";
+
+    @Builder.Default
+    @ManyToMany(mappedBy = "products")
+    private Set<ProductCollection> collections = new HashSet<>();
 }

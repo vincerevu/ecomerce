@@ -7,9 +7,12 @@ import BestSeller from "./BestSeller";
 import Testimonials from "./Testimonials";
 import Newsletter from "../Common/Newsletter";
 
+import YodySlider from "./YodySlider";
+
 const Home = () => {
   return (
-    <main className="pt-[150px] sm:pt-[162px] lg:pt-[172px]">
+    <main className="pt-0">
+      <YodySlider />
       <Collections />
       <Categories />
       <NewArrival />

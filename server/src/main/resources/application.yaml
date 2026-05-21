@@ -1,18 +1,18 @@
 server:
-  port: 8888
+  port: ${SERVER_PORT:8888}
 
 spring:
   application:
     name: ecommerce-backend
   datasource:
-    url: jdbc:postgresql://localhost:5432/ecommerce_db
-    username: postgres
-    password: 1
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ecommerce_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:1}
     driver-class-name: org.postgresql.Driver
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
   servlet:
     multipart:
       max-file-size: 50MB
@@ -25,6 +25,7 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
+        default_batch_fetch_size: 50
 
 app:
   message:
@@ -38,9 +39,9 @@ app:
     min-amount-for-freeship: 500000
   shipping:
     ghn:
-      base-url: https://dev-online-gateway.ghn.vn
-      token: "7154b80d-22ea-11f1-a973-aee5264794df"
-      shop-id: 199629
+      base-url: ${GHN_BASE_URL:https://dev-online-gateway.ghn.vn}
+      token: ${GHN_TOKEN:7154b80d-22ea-11f1-a973-aee5264794df}
+      shop-id: ${GHN_SHOP_ID:199629}
       from-district-id: 1542
       sender-name: "BAGY Hà Nội"
       sender-phone: "0900000001"
@@ -59,12 +60,18 @@ app:
       webhook-secret: ${SEPAY_WEBHOOK_SECRET:+WnBbEmD1fJebk1fWYf0eOPSh+TNLSPdPJ661X1CQtw=}
       expired-minutes: ${SEPAY_EXPIRED_MINUTES:60}
       test-amount: ${SEPAY_TEST_AMOUNT:2000}
+  r2:
+    account-id: ${R2_ACCOUNT_ID:}
+    access-key: ${R2_ACCESS_KEY:}
+    secret-key: ${R2_SECRET_KEY:}
+    bucket-name: ${R2_BUCKET_NAME:}
+    public-url: ${R2_PUBLIC_URL:}
   jwt:
     access-token:
-      secret: "DVXOOH+qixR6qrdtHNJtSYGubP1bi+djivNj2c+CqJcDGZXJnJt3/XvRF1sq/HreSv0b6DHnp3Zof4+1FrSdoQ=="
+      secret: ${JWT_ACCESS_SECRET:DVXOOH+qixR6qrdtHNJtSYGubP1bi+djivNj2c+CqJcDGZXJnJt3/XvRF1sq/HreSv0b6DHnp3Zof4+1FrSdoQ==}
       expiration: 3600
     refresh-token:
-      secret: "JJKSM8KwfOsVnlG3IUiwVRGukLPp2+5xWVxdXUVHvb6Zfs6m8vGYi2sJW0NCQkmmBKTeLSV09ChMxjSBoCk9cw=="
+      secret: ${JWT_REFRESH_SECRET:JJKSM8KwfOsVnlG3IUiwVRGukLPp2+5xWVxdXUVHvb6Zfs6m8vGYi2sJW0NCQkmmBKTeLSV09ChMxjSBoCk9cw==}
       expiration: 604800
 
 springdoc:
@@ -76,8 +83,3 @@ rate-limit:
     capacity: 20
     refill-tokens: 20
     refill-period: 1
-
-cloudinary:
-  cloud-name: dmhdv1ykp
-  api-key: 345613951591434
-  api-secret: CKMLH649SlqfC378-efHD7H7IYE

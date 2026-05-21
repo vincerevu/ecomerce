@@ -92,7 +92,7 @@ export const getPaymentStatusMeta = (status: PaymentStatus) => {
 };
 
 export const getOrderPreviewImage = (order: OrderRecord) =>
-  order.items.find((item) => item.imageUrl)?.imageUrl || "";
+  order.items?.find((item) => item.imageUrl)?.imageUrl || "";
 
 export const buildOrderSummary = (orders: OrderRecord[]) => ({
   total: orders.length,
@@ -143,9 +143,9 @@ export const filterOrders = ({
   return orders.filter((order) => {
     const matchesSearch =
       !normalizedSearch ||
-      order.orderCode.toLowerCase().includes(normalizedSearch) ||
-      order.customerName.toLowerCase().includes(normalizedSearch) ||
-      order.customerPhone.toLowerCase().includes(normalizedSearch) ||
+      (order.orderCode || "").toLowerCase().includes(normalizedSearch) ||
+      (order.customerName || "").toLowerCase().includes(normalizedSearch) ||
+      (order.customerPhone || "").toLowerCase().includes(normalizedSearch) ||
       (order.customerEmail || "").toLowerCase().includes(normalizedSearch);
 
     const matchesStatus = !statusFilter || order.status === statusFilter;
@@ -173,9 +173,9 @@ export const sortOrders = (
       case "valueAsc":
         return (left.totalAmount || 0) - (right.totalAmount || 0);
       case "customerAsc":
-        return left.customerName.localeCompare(right.customerName, "vi");
+        return (left.customerName || "").localeCompare(right.customerName || "", "vi");
       case "customerDesc":
-        return right.customerName.localeCompare(left.customerName, "vi");
+        return (right.customerName || "").localeCompare(left.customerName || "", "vi");
       case "recent":
       default:
         return (

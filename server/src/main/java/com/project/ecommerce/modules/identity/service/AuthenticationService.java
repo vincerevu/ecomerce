@@ -36,14 +36,14 @@ import java.util.Date;
 import java.util.StringJoiner;
 import java.util.UUID;
 
-import com.project.ecommerce.modules.message.service.SmsService;
+import com.project.ecommerce.modules.notification.service.SmsService;
 import com.project.ecommerce.modules.identity.repository.RoleRepository;
 import com.project.ecommerce.modules.identity.enums.RoleEnum;
 import com.project.ecommerce.modules.identity.entity.Role;
 import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 
-import com.project.ecommerce.modules.message.template.MessageTemplate;
+import com.project.ecommerce.modules.notification.template.MessageTemplate;
 
 @Service
 @RequiredArgsConstructor
@@ -82,8 +82,8 @@ public class AuthenticationService {
 
     public LoginResponse login(LoginRequest request) {
         String identifier = request.getPhone();
-        User user = userRepository.findByPhone(identifier)
-                .or(() -> userRepository.findByEmail(identifier))
+        User user = userRepository.findByPhoneWithRoles(identifier)
+                .or(() -> userRepository.findByEmailWithRoles(identifier))
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
 
         boolean isVerified = passwordEncoder.matches(request.getPassword(), user.getPassword());
@@ -113,7 +113,7 @@ public class AuthenticationService {
         String jit = signedJWT.getJWTClaimsSet().getJWTID();
         String userId = signedJWT.getJWTClaimsSet().getSubject();
 
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdWithRoles(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.UNAUTHENTICATED));
 
         if (!user.isActive()) {

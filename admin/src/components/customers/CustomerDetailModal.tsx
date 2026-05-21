@@ -4,6 +4,7 @@ import { orderApi, type OrderRecord } from "../../api/orderApi";
 import { paymentApi, type PaymentRecord } from "../../api/paymentApi";
 import Loader from "../common/Loader";
 import Pagination from "../common/Pagination";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
 import {
@@ -22,7 +23,7 @@ interface CustomerDetailModalProps {
 
 type CustomerHistoryTab = "overview" | "orders" | "payments";
 
-const HISTORY_PAGE_SIZE = 5;
+const HISTORY_DEFAULT_PAGE_SIZE = 5;
 
 const HISTORY_TABS: Array<{ key: CustomerHistoryTab; label: string; hint: string }> = [
   { key: "overview", label: "Tổng quan", hint: "Hồ sơ và chỉ số" },
@@ -138,6 +139,8 @@ export default function CustomerDetailModal({
   const [activeTab, setActiveTab] = useState<CustomerHistoryTab>("overview");
   const [orderPage, setOrderPage] = useState(1);
   const [paymentPage, setPaymentPage] = useState(1);
+  const [orderPageSize, setOrderPageSize] = useStoredPageSize("admin.customerDetail.orders.pageSize", HISTORY_DEFAULT_PAGE_SIZE);
+  const [paymentPageSize, setPaymentPageSize] = useStoredPageSize("admin.customerDetail.payments.pageSize", HISTORY_DEFAULT_PAGE_SIZE);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -221,18 +224,18 @@ export default function CustomerDetailModal({
     [payments],
   );
 
-  const orderTotalPages = Math.max(1, Math.ceil(orders.length / HISTORY_PAGE_SIZE));
+  const orderTotalPages = Math.max(1, Math.ceil(orders.length / orderPageSize));
   const safeOrderPage = Math.min(orderPage, orderTotalPages);
   const pagedOrders = orders.slice(
-    (safeOrderPage - 1) * HISTORY_PAGE_SIZE,
-    safeOrderPage * HISTORY_PAGE_SIZE,
+    (safeOrderPage - 1) * orderPageSize,
+    safeOrderPage * orderPageSize,
   );
 
-  const paymentTotalPages = Math.max(1, Math.ceil(payments.length / HISTORY_PAGE_SIZE));
+  const paymentTotalPages = Math.max(1, Math.ceil(payments.length / paymentPageSize));
   const safePaymentPage = Math.min(paymentPage, paymentTotalPages);
   const pagedPayments = payments.slice(
-    (safePaymentPage - 1) * HISTORY_PAGE_SIZE,
-    safePaymentPage * HISTORY_PAGE_SIZE,
+    (safePaymentPage - 1) * paymentPageSize,
+    safePaymentPage * paymentPageSize,
   );
 
   if (!customer || (!isOpen && !embedded)) return null;
@@ -440,7 +443,7 @@ export default function CustomerDetailModal({
                 pagedOrders.map((order) => {
                   const statusMeta = getOrderStatusMeta(order.status);
                   const paymentMeta = getPaymentStatusMeta(order.paymentStatus);
-                  const firstItem = order.items[0];
+                  const firstItem = order.items?.[0];
                   return (
                     <div
                       key={order.id}
@@ -503,14 +506,19 @@ export default function CustomerDetailModal({
                 })
               )}
             </div>
-            {orders.length > HISTORY_PAGE_SIZE ? (
+            {orders.length > 0 ? (
               <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/[0.06] dark:bg-[#111b2d]">
                 <Pagination
                   currentPage={safeOrderPage}
                   totalPages={orderTotalPages}
                   onPageChange={setOrderPage}
-                  summary={`Hiển thị ${(safeOrderPage - 1) * HISTORY_PAGE_SIZE + 1}-${Math.min(
-                    safeOrderPage * HISTORY_PAGE_SIZE,
+                  pageSize={orderPageSize}
+                  onPageSizeChange={(nextPageSize) => {
+                    setOrderPageSize(nextPageSize);
+                    setOrderPage(1);
+                  }}
+                  summary={`Hiển thị ${(safeOrderPage - 1) * orderPageSize + 1}-${Math.min(
+                    safeOrderPage * orderPageSize,
                     orders.length,
                   )} trong ${orders.length} đơn hàng`}
                 />
@@ -585,14 +593,19 @@ export default function CustomerDetailModal({
                 })
               )}
             </div>
-            {payments.length > HISTORY_PAGE_SIZE ? (
+            {payments.length > 0 ? (
               <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-white/[0.06] dark:bg-[#111b2d]">
                 <Pagination
                   currentPage={safePaymentPage}
                   totalPages={paymentTotalPages}
                   onPageChange={setPaymentPage}
-                  summary={`Hiển thị ${(safePaymentPage - 1) * HISTORY_PAGE_SIZE + 1}-${Math.min(
-                    safePaymentPage * HISTORY_PAGE_SIZE,
+                  pageSize={paymentPageSize}
+                  onPageSizeChange={(nextPageSize) => {
+                    setPaymentPageSize(nextPageSize);
+                    setPaymentPage(1);
+                  }}
+                  summary={`Hiển thị ${(safePaymentPage - 1) * paymentPageSize + 1}-${Math.min(
+                    safePaymentPage * paymentPageSize,
                     payments.length,
                   )} trong ${payments.length} giao dịch`}
                 />

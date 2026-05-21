@@ -7,6 +7,8 @@ import { toast } from "react-hot-toast";
 import { orderApi, type CustomerOrder } from "@/libs/order-api";
 import { useAuth } from "@/app/context/AuthContext";
 import { getOrderStatusLabel } from "@/libs/sepay";
+import CustomDropdown from "@/components/Common/CustomDropdown";
+import { PAGE_SIZE_OPTIONS, useStoredPageSize } from "@/hooks/useStoredPageSize";
 
 const statusTabs: Array<{
   label: string;
@@ -20,12 +22,34 @@ const statusTabs: Array<{
   { label: "Đã hủy", value: "CANCELLED" },
 ];
 
+const DEFAULT_PAGE_SIZE = 12;
+
+const getPaginationItems = (currentPage: number, totalPages: number) => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "...", totalPages];
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  }
+
+  return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
+};
+
 const OrderHistoryPage = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isLoading: isAuthLoading } = useAuth();
   const [activeStatus, setActiveStatus] = useState<CustomerOrder["status"] | undefined>();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useStoredPageSize("client.accountOrders.pageSize", DEFAULT_PAGE_SIZE);
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalElements, setTotalElements] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -65,18 +89,23 @@ const OrderHistoryPage = () => {
         const response = await orderApi.getMine({
           userId: user.id,
           status: activeStatus,
-          size: 20,
+          page: currentPage - 1,
+          size: pageSize,
         });
         setOrders(response.result.data || []);
+        setTotalPages(Math.max(1, response.result.totalPages || 1));
+        setTotalElements(response.result.totalElements || 0);
       } catch {
         setOrders([]);
+        setTotalPages(1);
+        setTotalElements(0);
       } finally {
         setIsLoading(false);
       }
     };
 
     void loadOrders();
-  }, [activeStatus, user?.id]);
+  }, [activeStatus, currentPage, pageSize, user?.id]);
 
   const hasOrders = useMemo(() => orders.length > 0, [orders]);
 
@@ -111,7 +140,10 @@ const OrderHistoryPage = () => {
               <button
                 key={tab.label}
                 type="button"
-                onClick={() => setActiveStatus(tab.value)}
+                onClick={() => {
+                  setActiveStatus(tab.value);
+                  setCurrentPage(1);
+                }}
                 className={`relative whitespace-nowrap pb-4 pt-1 text-lg transition ${
                   isActive
                     ? "font-semibold text-[#D39A00]"
@@ -134,7 +166,9 @@ const OrderHistoryPage = () => {
           <div className="py-24 text-center text-base text-dark-4">Đang tải đơn hàng...</div>
         ) : hasOrders ? (
           <div className="mt-6 space-y-4">
-            {orders.map((order) => (
+            {orders.map((order) => {
+              const orderItems = order.items || [];
+              return (
               <article
                 key={order.id}
                 className="rounded-[24px] border border-gray-3 bg-white p-5 shadow-1"
@@ -152,7 +186,7 @@ const OrderHistoryPage = () => {
                 </div>
 
                 <div className="mt-4 space-y-3 border-t border-gray-3 pt-4">
-                  {order.items.map((item) => (
+                  {orderItems.length > 0 ? orderItems.map((item) => (
                     <div key={item.id} className="flex items-center justify-between gap-4">
                       <div className="flex min-w-0 items-center gap-4">
                         <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[18px] bg-[#F6F7FB]">
@@ -176,7 +210,13 @@ const OrderHistoryPage = () => {
 
                       <span className="shrink-0 text-base font-medium text-dark">{item.unitPrice.toLocaleString("vi-VN")}đ</span>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="rounded-[18px] bg-[#F8FAFD] px-4 py-3 text-sm text-dark-4">
+                      {order.itemCount > 0
+                        ? `${order.itemCount} sản phẩm trong đơn hàng. Bấm để xem chi tiết.`
+                        : "Bấm để xem chi tiết đơn hàng."}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 flex items-center justify-between border-t border-gray-3 pt-4">
@@ -187,7 +227,76 @@ const OrderHistoryPage = () => {
                   </div>
                 </div>
               </article>
-            ))}
+              );
+            })}
+            <div className="flex flex-col items-center justify-between gap-4 rounded-[24px] border border-gray-3 bg-white px-4 py-4 shadow-1 sm:flex-row">
+              <p className="text-sm text-dark-4">
+                Hiển thị {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, totalElements)} trong {totalElements} đơn hàng
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <div className="flex items-center gap-2 text-sm text-dark-4">
+                  <span>Hiển thị</span>
+                  <CustomDropdown
+                    value={String(pageSize)}
+                    onChange={(nextValue) => {
+                      setPageSize(Number(nextValue));
+                      setCurrentPage(1);
+                    }}
+                    options={PAGE_SIZE_OPTIONS.map((option) => ({
+                      label: `${option} đơn`,
+                      value: String(option),
+                    }))}
+                    className="min-w-[108px]"
+                    buttonClassName="rounded-full border-gray-3 px-4 py-2 text-sm"
+                    menuClassName="rounded-2xl p-2"
+                    menuPlacement="top"
+                  />
+                </div>
+
+                <div className="flex flex-wrap justify-center gap-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                    className="rounded-full border border-gray-3 bg-white px-4 py-2 text-sm text-dark disabled:opacity-45"
+                  >
+                    Trước
+                  </button>
+
+                  {getPaginationItems(currentPage, totalPages).map((item, index) => (
+                    <button
+                      key={`${item}-${index}`}
+                      type="button"
+                      disabled={item === "..."}
+                      onClick={() => {
+                        if (typeof item === "number") {
+                          setCurrentPage(item);
+                        }
+                      }}
+                      className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
+                        item === "..."
+                          ? "cursor-default text-dark-4"
+                          : currentPage === item
+                            ? "bg-[#FFC84B] text-dark"
+                            : "border border-gray-3 bg-white text-dark hover:bg-[#FFF3D7]"
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                    className="rounded-full border border-gray-3 bg-white px-4 py-2 text-sm text-dark disabled:opacity-45"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-center">

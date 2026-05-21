@@ -3,12 +3,14 @@ import { Link, useLocation } from "react-router";
 import {
   BoxCubeIcon,
   ChevronDownIcon,
+  ChatIcon,
+  DollarLineIcon,
   GridIcon,
   GroupIcon,
   HorizontaLDots,
   ListIcon,
-  PieChartIcon,
   PlugInIcon,
+  ShootingStarIcon,
   UserCircleIcon,
 } from "../icons";
 import { useSidebar } from "../context/SidebarContext";
@@ -21,6 +23,25 @@ type NavItem = {
   permission?: string;
   subItems?: { name: string; path: string; pro?: boolean; new?: boolean; permission?: string }[];
 };
+
+const GearIcon = () => (
+  <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <path
+      d="M12 15.25A3.25 3.25 0 1 0 12 8.75a3.25 3.25 0 0 0 0 6.5Z"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M18.72 13.02c.05-.33.08-.67.08-1.02s-.03-.69-.08-1.02l2.02-1.58-1.9-3.29-2.38.96a7.2 7.2 0 0 0-1.76-1.02L14.34 3.5h-3.8l-.36 2.55c-.63.25-1.22.59-1.76 1.02l-2.38-.96-1.9 3.29 2.02 1.58c-.05.33-.08.67-.08 1.02s.03.69.08 1.02L4.14 14.6l1.9 3.29 2.38-.96c.54.43 1.13.77 1.76 1.02l.36 2.55h3.8l.36-2.55c.63-.25 1.22-.59 1.76-1.02l2.38.96 1.9-3.29-2.02-1.58Z"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 const navItems: NavItem[] = [
   {
@@ -46,6 +67,23 @@ const navItems: NavItem[] = [
     ],
   },
   {
+    icon: <ShootingStarIcon />,
+    name: "Banner",
+    path: "/banners",
+  },
+  {
+    icon: <DollarLineIcon />,
+    name: "Mã giảm giá",
+    path: "/coupons",
+    permission: "COUPON:VIEW",
+  },
+  {
+    icon: <ChatIcon />,
+    name: "Đánh giá",
+    path: "/reviews",
+    permission: "REVIEW:VIEW",
+  },
+  {
     icon: <UserCircleIcon />,
     name: "Khách hàng",
     path: "/customers",
@@ -61,11 +99,6 @@ const navItems: NavItem[] = [
 
 const othersItems: NavItem[] = [
   {
-    icon: <PieChartIcon />,
-    name: "Phân tích",
-    path: "/line-chart",
-  },
-  {
     icon: <PlugInIcon />,
     name: "Phân quyền",
     permission: "ROLE:VIEW",
@@ -73,6 +106,12 @@ const othersItems: NavItem[] = [
       { name: "Vai trò", path: "/roles", permission: "ROLE:VIEW" },
       { name: "Quyền", path: "/permissions", permission: "PERMISSION:VIEW" },
     ],
+  },
+  {
+    icon: <GearIcon />,
+    name: "Cài đặt",
+    path: "/app-settings",
+    permission: "__ADMIN_ONLY__",
   },
 ];
 

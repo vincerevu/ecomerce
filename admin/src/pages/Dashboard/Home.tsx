@@ -52,7 +52,7 @@ function getOrderStatusMeta(status: string) {
     case "CANCELLED":
     default:
       return { label: "Đã hủy", color: "error" as const };
-    }
+  }
 }
 
 const EMPTY_METRICS: DashboardMetrics = {
@@ -127,7 +127,7 @@ export default function Home() {
       <div className="space-y-6">
         <section className="overflow-hidden rounded-[28px] border border-gray-200 bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.08),_transparent_30%),linear-gradient(135deg,#ffffff_0%,#f8fafc_48%,#eef2ff_100%)] px-6 py-6 shadow-[0_22px_54px_rgba(15,23,42,0.08)] dark:border-white/[0.06] dark:bg-[radial-gradient(circle_at_top_left,_rgba(99,102,241,0.16),_transparent_28%),linear-gradient(135deg,#0f172a_0%,#111b2d_48%,#0b1220_100%)] dark:shadow-[0_24px_64px_rgba(2,6,23,0.42)]">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-           
+
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:min-w-[440px]">
               {[
@@ -253,11 +253,10 @@ export default function Home() {
                     <div key={point.label} className="flex flex-col items-center gap-3">
                       <div className="flex h-44 w-full items-end rounded-2xl bg-slate-100 px-2 pb-2 pt-4 dark:bg-white/[0.03]">
                         <div
-                          className={`w-full rounded-xl ${
-                            point.value === maxRevenuePoint
-                              ? "bg-brand-500 shadow-[0_12px_24px_rgba(99,102,241,0.28)]"
-                              : "bg-brand-400/80 shadow-[0_10px_20px_rgba(99,102,241,0.18)]"
-                          }`}
+                          className={`w-full rounded-xl ${point.value === maxRevenuePoint
+                            ? "bg-brand-500 shadow-[0_12px_24px_rgba(99,102,241,0.28)]"
+                            : "bg-brand-400/80 shadow-[0_10px_20px_rgba(99,102,241,0.18)]"
+                            }`}
                           style={{
                             height: `${Math.max(14, (point.value / maxRevenuePoint) * 100)}%`,
                           }}
@@ -317,9 +316,6 @@ export default function Home() {
                     <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                       Đơn mới nhất
                     </p>
-                    <h2 className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">
-                      Những đơn cần bạn quan sát trước
-                    </h2>
                   </div>
                   <Badge size="sm" color="info" variant="light">
                     {recentOrders.length} đơn
@@ -372,9 +368,7 @@ export default function Home() {
                       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
                         Cảnh báo tồn kho
                       </p>
-                      <h2 className="mt-2 text-xl font-semibold text-slate-900 dark:text-white">
-                        Sản phẩm cần nhập thêm
-                      </h2>
+
                     </div>
                     <Badge size="sm" color="warning" variant="light">
                       {stockAlerts.length} mục

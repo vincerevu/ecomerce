@@ -14,6 +14,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -41,9 +42,17 @@ public class PointHistoryService {
         return pointHistoryRepository.existsByUserIdAndOrderId(userId, orderId);
     }
 
+    @Transactional
     public void addPointsToUser(String userId, Integer points, String reason, String orderId) {
-        User user = userRepository.findById(userId)
+        if (orderId != null && pointHistoryRepository.existsByUserIdAndOrderId(userId, orderId)) {
+            return;
+        }
+
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
+        if (orderId != null && pointHistoryRepository.existsByUserIdAndOrderId(userId, orderId)) {
+            return;
+        }
 
         int currentPoints = user.getTotalPoints() == null ? 0 : user.getTotalPoints();
         int pointsToAdd = points == null ? 0 : points;
@@ -62,8 +71,9 @@ public class PointHistoryService {
         pointHistoryRepository.save(history);
     }
 
+    @Transactional
     public void deductPointsFromUser(String userId, Integer points, String reason) {
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByIdForUpdate(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_EXISTED));
 
         int currentPoints = user.getTotalPoints() == null ? 0 : user.getTotalPoints();

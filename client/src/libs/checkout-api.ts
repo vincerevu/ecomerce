@@ -33,7 +33,9 @@ export type CheckoutOrderPayload = {
   shippingWardCode?: string;
   notes?: string;
   shippingFee: number;
-  discountAmount: number;
+  discountAmount?: number;
+  couponCode?: string;
+  paymentMethod?: "COD" | "SEPAY";
   paymentStatus: "UNPAID" | "PENDING" | "PARTIALLY_PAID" | "PAID" | "FAILED" | "REFUNDED";
   status: "PENDING" | "CONFIRMED" | "PACKING" | "SHIPPING" | "DELIVERED" | "CANCELLED";
   items: CheckoutOrderItemPayload[];
@@ -51,6 +53,8 @@ export type OrderResponse = {
   subtotal: number;
   shippingFee: number;
   discountAmount: number;
+  couponCode?: string;
+  couponName?: string;
   totalAmount: number;
 };
 

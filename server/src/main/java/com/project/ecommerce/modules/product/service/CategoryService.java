@@ -10,6 +10,8 @@ import com.project.ecommerce.modules.product.entity.Category;
 import com.project.ecommerce.modules.product.mapper.CategoryMapper;
 import com.project.ecommerce.modules.product.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -27,6 +29,7 @@ public class CategoryService {
     private final CategoryMapper categoryMapper;
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "categories", key = "'all'", condition = "#spec == null")
     public List<CategoryResponse> getAll(Specification<Category> spec) {
         return categoryRepository.findAll(spec).stream()
                 .map(categoryMapper::toResponse)
@@ -47,12 +50,14 @@ public class CategoryService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "categories", key = "'id_' + #id")
     public CategoryResponse getById(String id) {
         return categoryMapper.toResponse(findOrThrow(id));
     }
 
     @Transactional
     @PreAuthorize("hasAuthority('CATEGORY:CREATE')")
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse create(CreateCategoryRequest req) {
         if (categoryRepository.existsBySlug(req.getSlug()))
             throw new AppException(ErrorCode.RESOURCE_NOT_FOUND);
@@ -65,6 +70,7 @@ public class CategoryService {
 
     @Transactional
     @PreAuthorize("hasAuthority('CATEGORY:UPDATE')")
+    @CacheEvict(value = "categories", allEntries = true)
     public CategoryResponse update(String id, UpdateCategoryRequest req) {
         Category category = findOrThrow(id);
         categoryMapper.updateCategory(category, req);
@@ -74,6 +80,7 @@ public class CategoryService {
 
     @Transactional
     @PreAuthorize("hasAuthority('CATEGORY:DELETE')")
+    @CacheEvict(value = "categories", allEntries = true)
     public void delete(String id) {
         Category category = findOrThrow(id);
         category.setIsDeleted(true);

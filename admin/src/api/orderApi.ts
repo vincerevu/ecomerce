@@ -54,7 +54,7 @@ export interface OrderRecord {
   totalAmount: number;
   itemCount: number;
   createdAt?: string;
-  items: OrderItemRecord[];
+  items?: OrderItemRecord[];
 }
 
 export interface CreateOrderItemPayload {

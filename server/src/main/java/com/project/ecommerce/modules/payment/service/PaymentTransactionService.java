@@ -20,6 +20,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -41,20 +44,31 @@ public class PaymentTransactionService {
     public PageResponse<PaymentTransactionResponse> getPayments(Pageable pageable,
             Specification<PaymentTransaction> spec) {
         Page<PaymentTransaction> paymentPage = paymentTransactionRepository.findAll(spec, pageable);
+        List<String> paymentIds = paymentPage.getContent().stream()
+                .map(PaymentTransaction::getId)
+                .toList();
+        Map<String, PaymentTransaction> paymentById = paymentTransactionRepository.findDetailsByIds(paymentIds)
+                .stream()
+                .collect(Collectors.toMap(PaymentTransaction::getId, Function.identity()));
         return PageResponse.<PaymentTransactionResponse>builder()
                 .currentPage(pageable.getPageNumber())
                 .pageSize(pageable.getPageSize())
                 .totalPages(paymentPage.getTotalPages())
                 .totalElements(paymentPage.getTotalElements())
                 .last(paymentPage.isLast())
-                .data(paymentPage.getContent().stream().map(paymentTransactionMapper::toResponse).toList())
+                .data(paymentIds.stream()
+                        .map(paymentById::get)
+                        .filter(java.util.Objects::nonNull)
+                        .map(paymentTransactionMapper::toResponse)
+                        .toList())
                 .build();
     }
 
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('PAYMENT:VIEW')")
     public PaymentTransactionResponse getById(String id) {
-        return paymentTransactionMapper.toResponse(findOrThrow(id));
+        return paymentTransactionMapper.toResponse(paymentTransactionRepository.findDetailById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_TRANSACTION_NOT_FOUND)));
     }
 
     @Transactional
@@ -66,7 +80,9 @@ public class PaymentTransactionService {
     @Transactional
     @PreAuthorize("hasAuthority('PAYMENT:UPDATE')")
     public PaymentTransactionResponse update(String id, UpdatePaymentTransactionRequest request) {
-        PaymentTransaction paymentTransaction = findOrThrow(id);
+        PaymentTransaction existing = findOrThrow(id);
+        Order order = lockOrder(existing.getOrder());
+        PaymentTransaction paymentTransaction = findForUpdate(id);
         paymentTransaction.setStatus(request.getStatus());
         paymentTransaction.setProviderReference(request.getProviderReference());
         paymentTransaction.setProcessedAt(request.getProcessedAt());
@@ -76,15 +92,16 @@ public class PaymentTransactionService {
         normalizeTimestamps(paymentTransaction);
 
         PaymentTransaction saved = paymentTransactionRepository.save(paymentTransaction);
-        syncOrderPaymentStatusInternal(saved.getOrder());
+        syncOrderPaymentStatusInternal(order);
         return paymentTransactionMapper.toResponse(saved);
     }
 
     @Transactional
     @PreAuthorize("hasAuthority('PAYMENT:DELETE')")
     public void delete(String id) {
-        PaymentTransaction paymentTransaction = findOrThrow(id);
-        Order order = paymentTransaction.getOrder();
+        PaymentTransaction existing = findOrThrow(id);
+        Order order = lockOrder(existing.getOrder());
+        PaymentTransaction paymentTransaction = findForUpdate(id);
         paymentTransaction.setIsDeleted(true);
         paymentTransactionRepository.save(paymentTransaction);
         syncOrderPaymentStatusInternal(order);
@@ -134,7 +151,9 @@ public class PaymentTransactionService {
             PaymentStatus status,
             Object rawResponse,
             String providerReference) {
-        PaymentTransaction paymentTransaction = findOrThrow(paymentId);
+        PaymentTransaction existing = findOrThrow(paymentId);
+        Order order = lockOrder(existing.getOrder());
+        PaymentTransaction paymentTransaction = findForUpdate(paymentId);
         paymentTransaction.setStatus(status);
         paymentTransaction.setRawResponse(rawResponse != null ? String.valueOf(rawResponse) : null);
         if (providerReference != null && !providerReference.isBlank()) {
@@ -142,7 +161,7 @@ public class PaymentTransactionService {
         }
         normalizeTimestamps(paymentTransaction);
         PaymentTransaction saved = paymentTransactionRepository.save(paymentTransaction);
-        syncOrderPaymentStatusInternal(saved.getOrder());
+        syncOrderPaymentStatusInternal(order);
         return paymentTransactionMapper.toResponse(saved);
     }
 
@@ -153,12 +172,13 @@ public class PaymentTransactionService {
 
     @Transactional
     public void refreshOrderPaymentStatus(Order order) {
-        syncOrderPaymentStatusInternal(order);
+        syncOrderPaymentStatusInternal(lockOrder(order));
     }
 
     @Transactional
     public void failOpenChargeTransactions(Order order, String failureReason) {
-        List<PaymentTransaction> transactions = paymentTransactionRepository.findByOrder(order).stream()
+        Order lockedOrder = lockOrder(order);
+        List<PaymentTransaction> transactions = paymentTransactionRepository.findByOrderForUpdate(lockedOrder).stream()
                 .filter(transaction -> !Boolean.TRUE.equals(transaction.getIsDeleted()))
                 .filter(transaction -> transaction.getTransactionType() == PaymentTransactionType.CHARGE)
                 .filter(transaction -> transaction.getStatus() != PaymentStatus.PAID
@@ -176,7 +196,7 @@ public class PaymentTransactionService {
             paymentTransactionRepository.save(transaction);
         }
 
-        syncOrderPaymentStatusInternal(order);
+        syncOrderPaymentStatusInternal(lockedOrder);
     }
 
     private PaymentTransaction findOrThrow(String id) {
@@ -184,12 +204,25 @@ public class PaymentTransactionService {
                 .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_TRANSACTION_NOT_FOUND));
     }
 
+    private PaymentTransaction findForUpdate(String id) {
+        return paymentTransactionRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new AppException(ErrorCode.PAYMENT_TRANSACTION_NOT_FOUND));
+    }
+
     private Order resolveOrder(String orderId) {
-        return orderRepository.findById(orderId)
+        return orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
     }
 
+    private Order lockOrder(Order order) {
+        if (order == null || order.getId() == null) {
+            throw new AppException(ErrorCode.ORDER_NOT_FOUND);
+        }
+        return resolveOrder(order.getId());
+    }
+
     private PaymentTransactionResponse createInternal(Order order, CreatePaymentTransactionRequest request) {
+        order = lockOrder(order);
         PaymentTransaction paymentTransaction = paymentTransactionMapper.toEntity(request);
         paymentTransaction.setOrder(order);
         paymentTransaction.setTransactionCode(resolveTransactionCode(request.getTransactionCode()));
@@ -224,7 +257,7 @@ public class PaymentTransactionService {
     }
 
     private void syncOrderPaymentStatusInternal(Order order) {
-        List<PaymentTransaction> transactions = paymentTransactionRepository.findByOrder(order).stream()
+        List<PaymentTransaction> transactions = paymentTransactionRepository.findByOrderForUpdate(order).stream()
                 .filter(transaction -> !Boolean.TRUE.equals(transaction.getIsDeleted()))
                 .sorted(Comparator.comparing(PaymentTransaction::getCreatedAt,
                         Comparator.nullsLast(Comparator.naturalOrder())))

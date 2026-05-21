@@ -25,8 +25,12 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -50,8 +54,20 @@ public class InventoryService {
     @PreAuthorize("hasAuthority('INVENTORY:VIEW')")
     public PageResponse<InventoryStockResponse> getStocks(Pageable pageable, Specification<ProductVariant> spec) {
         Page<ProductVariant> variantPage = productVariantRepository.findAll(spec, pageable);
-        List<InventoryStockResponse> content = variantPage.getContent().stream()
-                .map(this::toStockResponse)
+        List<String> variantIds = variantPage.getContent().stream()
+                .map(ProductVariant::getId)
+                .toList();
+        Map<String, ProductVariant> pagedVariantById = variantPage.getContent().stream()
+                .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
+        Map<String, ProductVariant> variantById = productVariantRepository.findDetailsByIds(variantIds)
+                .stream()
+                .collect(Collectors.toMap(ProductVariant::getId, Function.identity()));
+        Map<String, InventoryMovement> latestImportByVariantId = findLatestImportsByVariantId(variantIds);
+        List<InventoryStockResponse> content = variantIds.stream()
+                .map(id -> toStockResponse(
+                        variantById.getOrDefault(id, pagedVariantById.get(id)),
+                        latestImportByVariantId.get(id)))
+                .filter(java.util.Objects::nonNull)
                 .toList();
         Page<InventoryStockResponse> stockPage = new PageImpl<>(content, pageable, variantPage.getTotalElements());
         return PageResponse.<InventoryStockResponse>builder()
@@ -68,33 +84,54 @@ public class InventoryService {
     @PreAuthorize("hasAuthority('INVENTORY:VIEW')")
     public PageResponse<StockImportReceiptResponse> getReceipts(Pageable pageable, Specification<StockImportReceipt> spec) {
         Page<StockImportReceipt> receiptPage = stockImportReceiptRepository.findAll(spec, pageable);
+        List<String> receiptIds = receiptPage.getContent().stream()
+                .map(StockImportReceipt::getId)
+                .toList();
+        Map<String, StockImportReceipt> receiptById = stockImportReceiptRepository.findDetailsByIds(receiptIds)
+                .stream()
+                .collect(Collectors.toMap(StockImportReceipt::getId, Function.identity()));
         return PageResponse.<StockImportReceiptResponse>builder()
                 .currentPage(receiptPage.getNumber())
                 .pageSize(receiptPage.getSize())
                 .totalPages(receiptPage.getTotalPages())
                 .totalElements(receiptPage.getTotalElements())
                 .last(receiptPage.isLast())
-                .data(receiptPage.getContent().stream().map(stockImportReceiptMapper::toResponse).toList())
+                .data(receiptIds.stream()
+                        .map(receiptById::get)
+                        .filter(java.util.Objects::nonNull)
+                        .map(stockImportReceiptMapper::toResponse)
+                        .toList())
                 .build();
     }
 
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('INVENTORY:VIEW')")
     public StockImportReceiptResponse getReceiptById(String id) {
-        return stockImportReceiptMapper.toResponse(findReceiptOrThrow(id));
+        return stockImportReceiptMapper.toResponse(stockImportReceiptRepository.findDetailById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.STOCK_IMPORT_RECEIPT_NOT_FOUND)));
     }
 
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('INVENTORY:VIEW')")
     public PageResponse<InventoryMovementResponse> getMovements(Pageable pageable, Specification<InventoryMovement> spec) {
         Page<InventoryMovement> movementPage = inventoryMovementRepository.findAll(spec, pageable);
+        List<String> movementIds = movementPage.getContent().stream()
+                .map(InventoryMovement::getId)
+                .toList();
+        Map<String, InventoryMovement> movementById = inventoryMovementRepository.findDetailsByIds(movementIds)
+                .stream()
+                .collect(Collectors.toMap(InventoryMovement::getId, Function.identity()));
         return PageResponse.<InventoryMovementResponse>builder()
                 .currentPage(movementPage.getNumber())
                 .pageSize(movementPage.getSize())
                 .totalPages(movementPage.getTotalPages())
                 .totalElements(movementPage.getTotalElements())
                 .last(movementPage.isLast())
-                .data(movementPage.getContent().stream().map(inventoryMovementMapper::toResponse).toList())
+                .data(movementIds.stream()
+                        .map(movementById::get)
+                        .filter(java.util.Objects::nonNull)
+                        .map(inventoryMovementMapper::toResponse)
+                        .toList())
                 .build();
     }
 
@@ -113,7 +150,7 @@ public class InventoryService {
 
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (CreateStockImportItemRequest itemRequest : request.getItems()) {
-            ProductVariant variant = productVariantRepository.findById(itemRequest.getProductVariantId())
+            ProductVariant variant = productVariantRepository.findByIdForUpdate(itemRequest.getProductVariantId())
                     .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_VARIANT_NOT_FOUND));
             int beforeQuantity = variant.getStockQuantity() == null ? 0 : variant.getStockQuantity();
             int importQuantity = itemRequest.getQuantity();
@@ -156,9 +193,10 @@ public class InventoryService {
         return stockImportReceiptMapper.toResponse(stockImportReceiptRepository.save(savedReceipt));
     }
 
-    private InventoryStockResponse toStockResponse(ProductVariant variant) {
-        Optional<InventoryMovement> latestImport = inventoryMovementRepository
-                .findTopByProductVariantIdAndMovementTypeOrderByCreatedAtDesc(variant.getId(), InventoryMovementType.IMPORT);
+    private InventoryStockResponse toStockResponse(ProductVariant variant, InventoryMovement latestImport) {
+        if (variant == null) {
+            return null;
+        }
         ProductColor color = variant.getProductColor();
         String imageUrl = null;
         if (color != null && color.getImages() != null) {
@@ -181,9 +219,21 @@ public class InventoryService {
                 .originalPrice(variant.getOriginalPrice())
                 .salePrice(variant.getSalePrice())
                 .stockQuantity(variant.getStockQuantity())
-                .latestUnitCost(latestImport.map(InventoryMovement::getUnitCost).orElse(null))
-                .latestImportedAt(latestImport.map(InventoryMovement::getCreatedAt).orElse(null))
+                .latestUnitCost(latestImport != null ? latestImport.getUnitCost() : null)
+                .latestImportedAt(latestImport != null ? latestImport.getCreatedAt() : null)
                 .build();
+    }
+
+    private Map<String, InventoryMovement> findLatestImportsByVariantId(List<String> variantIds) {
+        if (variantIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, InventoryMovement> latestByVariantId = new LinkedHashMap<>();
+        inventoryMovementRepository
+                .findByProductVariantIdInAndMovementTypeOrderByCreatedAtDesc(variantIds, InventoryMovementType.IMPORT)
+                .forEach(movement -> latestByVariantId.putIfAbsent(movement.getProductVariant().getId(), movement));
+        return latestByVariantId;
     }
 
     private StockImportReceipt findReceiptOrThrow(String id) {

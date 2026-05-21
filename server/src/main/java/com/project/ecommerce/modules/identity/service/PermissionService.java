@@ -11,6 +11,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ public class PermissionService {
 
     @PreAuthorize("hasAuthority('PERMISSION:CREATE')")
     @Transactional
+    @CacheEvict(value = {"permissions", "roles"}, allEntries = true)
     public PermissionResponse createPermission(CreatePermissionRequest request) {
         if (permissionRepository.existsByNameAndIsDeletedFalse(request.getName())) {
             throw new AppException(ErrorCode.INVALID_KEY);
@@ -42,6 +45,7 @@ public class PermissionService {
     }
 
     @PreAuthorize("hasAuthority('PERMISSION:VIEW')")
+    @Cacheable(value = "permissions", key = "'all'")
     public List<PermissionResponse> getAllPermissions() {
         return permissionRepository.findAllByIsDeletedFalse()
                 .stream()
@@ -50,6 +54,7 @@ public class PermissionService {
     }
 
     @PreAuthorize("hasAuthority('PERMISSION:VIEW')")
+    @Cacheable(value = "permissions", key = "'name_' + #id")
     public PermissionResponse getPermissionById(String id) {
         Permission permission = permissionRepository.findByNameAndIsDeletedFalse(id)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -58,6 +63,7 @@ public class PermissionService {
 
     @PreAuthorize("hasAuthority('PERMISSION:DELETE')")
     @Transactional
+    @CacheEvict(value = {"permissions", "roles"}, allEntries = true)
     public void deletePermission(String id) {
         Permission permission = permissionRepository.findByNameAndIsDeletedFalse(id)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));

@@ -19,6 +19,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import java.util.Arrays;
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -62,6 +63,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/checkout/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/shipments/fee-estimates").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/shipments/services").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/coupons/validate").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/coupons/available").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/coupons/public").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/products/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/products").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
@@ -71,6 +75,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/collections/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/collections").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/shipments/locations/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/banners/active").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/banners/position/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/settings/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/media/presigned-url").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/reviews/products/**").permitAll()
                 .requestMatchers(SWAGGER_ENDPOINTS).permitAll()
                 .anyRequest()
                 .authenticated());
@@ -87,17 +96,16 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(
-                Arrays.asList(
-                        "http://localhost:5173",
-                        "http://127.0.0.1:5173",
-                        "http://localhost:3000",
-                        "http://127.0.0.1:3000",
-                        "http://localhost:8080",
-                        "http://127.0.0.1:8080"));
+        String allowedOrigins = System.getenv().getOrDefault(
+                "CORS_ALLOWED_ORIGINS",
+                "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000,http://localhost:8080,http://127.0.0.1:8080");
+        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList();
+        configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(
-                Arrays.asList("Authorization", "Content-Type", "Accept", "X-Requested-With", "Origin"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 

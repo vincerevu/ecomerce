@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import type { OrderRecord } from "../../api/orderApi";
 import { orderApi } from "../../api/orderApi";
 import { useAuth } from "../../context/AuthContext";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 import {
   EyeIcon,
   PlusIcon,
@@ -24,13 +25,12 @@ import {
   PAYMENT_STATUS_OPTIONS,
   formatCurrency,
   formatDateTime,
-  getOrderPreviewImage,
   getOrderStatusMeta,
   getPaymentStatusMeta,
   type OrderSortPreset,
 } from "./orderTable.utils";
 
-const PAGE_SIZE = 8;
+const DEFAULT_PAGE_SIZE = 8;
 
 
 const STATUS_FILTER_OPTIONS: Option[] = [
@@ -93,6 +93,7 @@ export default function OrdersTable() {
   const [paymentFilter, setPaymentFilter] = useState("");
   const [sortPreset, setSortPreset] = useState<OrderSortPreset>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useStoredPageSize("admin.orders.pageSize", DEFAULT_PAGE_SIZE);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<OrderRecord | null>(null);
@@ -123,7 +124,7 @@ export default function OrdersTable() {
                 : "createdAt,desc";
       const response = await orderApi.getOrders({
         page: Math.max(0, page - 1),
-        size: PAGE_SIZE,
+        size: pageSize,
         sort,
         ...(filter ? { filter } : {}),
       });
@@ -157,11 +158,11 @@ searchTerm || statusFilter || paymentFilter);
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, statusFilter, paymentFilter, sortPreset]);
+  }, [debouncedSearchTerm, statusFilter, paymentFilter, sortPreset, pageSize]);
 
   useEffect(() => {
     void loadOrders(currentPage);
-  }, [currentPage, debouncedSearchTerm, statusFilter, paymentFilter, sortPreset]);
+  }, [currentPage, debouncedSearchTerm, statusFilter, paymentFilter, sortPreset, pageSize]);
 
   const handleDeleteOrder = async () => {
     if (!deleteTarget) return;
@@ -269,7 +270,7 @@ searchTerm || statusFilter || paymentFilter);
                   <TableCell colSpan={7} className="py-16">
                     <div className="flex flex-col items-center justify-center gap-3 text-gray-400">
                       <Loader size="md" />
-                      <span className="text-sm">?ang t?i danh s?ch ??n h?ng...</span>
+                      <span className="text-sm">Đang tải danh sách đơn hàng...</span>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -283,7 +284,6 @@ searchTerm || statusFilter || paymentFilter);
                 orders.map((order) => {
                   const orderStatusMeta = getOrderStatusMeta(order.status);
                   const paymentMeta = getPaymentStatusMeta(order.paymentStatus);
-                  const previewImage = getOrderPreviewImage(order);
                   return (
                     <TableRow
                       key={order.id}
@@ -311,25 +311,9 @@ searchTerm || statusFilter || paymentFilter);
                         </div>
                       </TableCell>
                       <TableCell className="px-4 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="h-11 w-11 overflow-hidden rounded-2xl bg-gray-100 dark:bg-white/[0.05]">
-                            {previewImage ? (
-                              <img src={previewImage} alt={order.orderCode} className="h-full w-full object-cover" />
-                            ) : (
-                              <div className="flex h-full items-center justify-center text-[10px] text-gray-400">
-                                Không ảnh
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-gray-800 dark:text-white/90">
-                              {order.itemCount} sản phẩm
-                            </p>
-                            <p className="truncate text-xs text-gray-500 dark:text-gray-400">
-                              {order.items[0]?.productName || "Chưa có chi tiết"}
-                            </p>
-                          </div>
-                        </div>
+                        <p className="truncate text-sm font-medium text-gray-800 dark:text-white/90">
+                          {order.itemCount} sản phẩm
+                        </p>
                       </TableCell>
                       <TableCell className="px-4 py-3.5">
                         <Badge size="sm" color={paymentMeta.color} variant="light">
@@ -388,10 +372,15 @@ searchTerm || statusFilter || paymentFilter);
           currentPage={safePage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setCurrentPage(1);
+          }}
           summary={
             totalElements > 0
-              ? `Hiển thị ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(
-                  safePage * PAGE_SIZE,
+              ? `Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(
+                  safePage * pageSize,
                   totalElements,
                 )} trong ${totalElements} đơn hàng`
               : "Không có kết quả"

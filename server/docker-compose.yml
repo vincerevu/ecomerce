@@ -28,6 +28,27 @@ services:
       - "4001:4001"
     restart: always
 
+  chatbot:
+    build:
+      context: ../chatbot
+    container_name: ecommerce-chatbot
+    ports:
+      - "8000:8000"
+    environment:
+      ECOMMERCE_API_BASE_URL: http://host.docker.internal:8888/api/v1
+      SQLITE_PATH: /app/data/chatbot.sqlite3
+      CHROMA_PERSIST_DIR: /app/data/chroma
+      CHROMA_COLLECTION: bagy_documents
+      RETRIEVAL_PROVIDER: nvidia
+      NVIDIA_RERANK_URL: https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-nemotron-rerank-1b-v2/reranking
+      REDIS_URL: redis://redis:6379/1
+    volumes:
+      - chatbot_data:/app/data
+    depends_on:
+      - redis
+    restart: unless-stopped
+
 volumes:
   redis_data:
   redis_insight_data:
+  chatbot_data:

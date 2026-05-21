@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { userApi, type UserProfileResponse } from "@/libs/user-api";
 import { addressApi, type AddressRecord } from "@/libs/address-api";
+import { couponApi } from "@/libs/coupon-api";
 import ProfileEditModal from "./ProfileEditModal";
 import AddressBookModal from "./AddressBookModal";
 import { useAuth } from "@/app/context/AuthContext";
@@ -15,6 +16,7 @@ const MyAccount = () => {
   const { user, isLoading, logout, updateUser } = useAuth();
   const [profile, setProfile] = useState<UserProfileResponse | null>(null);
   const [addresses, setAddresses] = useState<AddressRecord[]>([]);
+  const [voucherCount, setVoucherCount] = useState(0);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isAddressModalOpen, setIsAddressModalOpen] = useState(false);
 
@@ -52,7 +54,17 @@ const MyAccount = () => {
       }
     };
 
+    const loadVouchers = async () => {
+      try {
+        const response = await couponApi.getPublic();
+        setVoucherCount(response.result?.length || 0);
+      } catch {
+        setVoucherCount(0);
+      }
+    };
+
     void loadProfile();
+    void loadVouchers();
   }, [updateUser, user]);
 
   if (isLoading || !profile) {
@@ -124,7 +136,7 @@ const MyAccount = () => {
                   <path d="M3 8.5H21V15.5C21 17.433 19.433 19 17.5 19H6.5C4.567 19 3 17.433 3 15.5V8.5Z" stroke="currentColor" strokeWidth="1.8" />
                   <path d="M8 8.5V7.5C8 6.11929 9.11929 5 10.5 5H13.5C14.8807 5 16 6.11929 16 7.5V8.5" stroke="currentColor" strokeWidth="1.8" />
                 </svg>
-                <span className="text-sm font-medium text-dark sm:text-base">Voucher (0)</span>
+                <span className="text-sm font-medium text-dark sm:text-base">Voucher ({voucherCount})</span>
               </button>
             </div>
 

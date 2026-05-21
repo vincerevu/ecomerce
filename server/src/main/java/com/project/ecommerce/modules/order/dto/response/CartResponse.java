@@ -1,0 +1,23 @@
+package com.project.ecommerce.modules.order.dto.response;
+
+import java.math.BigDecimal;
+import java.util.List;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.experimental.FieldDefaults;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@FieldDefaults(level = AccessLevel.PRIVATE)
+public class CartResponse {
+    String id;
+    String userId;
+    List<CartItemResponse> items;
+    Integer totalQuantity;
+    BigDecimal subtotal;
+}

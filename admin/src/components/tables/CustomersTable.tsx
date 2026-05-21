@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { CustomerRecord } from "../../api/customerApi";
 import { customerApi } from "../../api/customerApi";
 import { useAuth } from "../../context/AuthContext";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 import { EyeIcon, PlusIcon, TrashBinIcon } from "../../icons";
 import { showError, showSuccess } from "../../utils/toast";
 import { hasAnyPermission } from "../auth/PermissionGuard";
@@ -22,7 +23,7 @@ import {
   type CustomerSortPreset,
 } from "./customerTable.utils";
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 interface CustomersTableProps {
   onCreate?: () => void;
@@ -102,6 +103,7 @@ export default function CustomersTable({ onCreate, onView }: CustomersTableProps
   const [tierFilter, setTierFilter] = useState("");
   const [sortPreset, setSortPreset] = useState<CustomerSortPreset>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useStoredPageSize("admin.customers.pageSize", DEFAULT_PAGE_SIZE);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
   const [deleteTarget, setDeleteTarget] = useState<CustomerRecord | null>(null);
@@ -131,7 +133,7 @@ export default function CustomersTable({ onCreate, onView }: CustomersTableProps
                 : "createdAt,desc";
       const response = await customerApi.getCustomers({
         page: Math.max(0, page - 1),
-        size: PAGE_SIZE,
+        size: pageSize,
         sort,
         ...(filter ? { filter } : {}),
       });
@@ -175,11 +177,11 @@ export default function CustomersTable({ onCreate, onView }: CustomersTableProps
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, tierFilter, statusFilter, sortPreset, segment]);
+  }, [debouncedSearchTerm, tierFilter, statusFilter, sortPreset, segment, pageSize]);
 
   useEffect(() => {
     void loadCustomers(currentPage);
-  }, [currentPage, debouncedSearchTerm, tierFilter, statusFilter, sortPreset, segment]);
+  }, [currentPage, debouncedSearchTerm, tierFilter, statusFilter, sortPreset, segment, pageSize]);
 
   const handleDeleteCustomer = async () => {
     if (!deleteTarget) return;
@@ -359,10 +361,15 @@ export default function CustomersTable({ onCreate, onView }: CustomersTableProps
           currentPage={safePage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setCurrentPage(1);
+          }}
           summary={
             totalElements > 0
-              ? `Hiển thị ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(
-                  safePage * PAGE_SIZE,
+              ? `Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(
+                  safePage * pageSize,
                   totalElements,
                 )} trong ${totalElements} khách hàng`
               : "Không có kết quả"

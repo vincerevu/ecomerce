@@ -47,7 +47,7 @@ export type CustomerOrder = {
   totalAmount: number;
   itemCount: number;
   createdAt: string;
-  items: CustomerOrderItem[];
+  items?: CustomerOrderItem[];
 };
 
 export const orderApi = {

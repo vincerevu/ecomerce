@@ -14,6 +14,7 @@ interface SelectProps {
   value?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
+  menuPlacement?: "top" | "bottom";
 }
 
 const Select: React.FC<SelectProps> = ({
@@ -25,6 +26,7 @@ const Select: React.FC<SelectProps> = ({
   value,
   searchable = false,
   searchPlaceholder = "Gõ để tìm nhanh",
+  menuPlacement = "bottom",
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -92,7 +94,11 @@ const Select: React.FC<SelectProps> = ({
       </button>
 
       {isOpen && (
-        <div className="absolute z-50 mt-1.5 w-full origin-top scale-100 transform overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl transition-all duration-200 opacity-100 dark:border-white/[0.08] dark:bg-[#111b2d] dark:shadow-[0_18px_40px_rgba(2,6,23,0.45)]">
+        <div
+          className={`absolute z-50 w-full scale-100 transform overflow-hidden rounded-lg border border-gray-200 bg-white opacity-100 shadow-xl transition-all duration-200 dark:border-white/[0.08] dark:bg-[#111b2d] dark:shadow-[0_18px_40px_rgba(2,6,23,0.45)] ${
+            menuPlacement === "top" ? "bottom-[calc(100%+6px)] origin-bottom" : "mt-1.5 origin-top"
+          }`}
+        >
           {searchable ? (
             <div className="border-b border-gray-100 px-3 py-2 dark:border-white/[0.08]">
               <input

@@ -38,6 +38,8 @@ public class OrderResponse {
     BigDecimal subtotal;
     BigDecimal shippingFee;
     BigDecimal discountAmount;
+    String couponCode;
+    String couponName;
     BigDecimal totalAmount;
     Integer itemCount;
     LocalDateTime createdAt;

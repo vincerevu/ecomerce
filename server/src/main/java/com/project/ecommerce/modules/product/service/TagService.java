@@ -8,6 +8,8 @@ import com.project.ecommerce.modules.product.entity.Tag;
 import com.project.ecommerce.modules.product.mapper.TagMapper;
 import com.project.ecommerce.modules.product.repository.TagRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ public class TagService {
     private final TagMapper tagMapper;
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "tags", key = "'all'", condition = "#spec == null")
     public List<TagResponse> getAll(Specification<Tag> spec) {
         return tagRepository.findAll(spec).stream()
                 .map(tagMapper::toResponse)
@@ -30,18 +33,21 @@ public class TagService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "tags", key = "'id_' + #id")
     public TagResponse getById(String id) {
         return tagMapper.toResponse(findOrThrow(id));
     }
 
     @Transactional
     @PreAuthorize("hasAuthority('TAG:CREATE')")
+    @CacheEvict(value = "tags", allEntries = true)
     public TagResponse create(CreateTagRequest req) {
         return tagMapper.toResponse(tagRepository.save(tagMapper.toEntity(req)));
     }
 
     @Transactional
     @PreAuthorize("hasAuthority('TAG:UPDATE')")
+    @CacheEvict(value = "tags", allEntries = true)
     public TagResponse update(String id, CreateTagRequest req) {
         Tag tag = findOrThrow(id);
         tagMapper.updateTag(tag, req);
@@ -50,6 +56,7 @@ public class TagService {
 
     @Transactional
     @PreAuthorize("hasAuthority('TAG:DELETE')")
+    @CacheEvict(value = "tags", allEntries = true)
     public void delete(String id) {
         Tag tag = findOrThrow(id);
         tag.setIsDeleted(true);

@@ -1,0 +1,190 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: ecommerce-nginx
+    environment:
+      CLIENT_HOST: ${CLIENT_HOST:-_}
+      ADMIN_HOST: ${ADMIN_HOST:-admin.localhost}
+      API_HOST: ${API_HOST:-api.localhost}
+      CHATBOT_HOST: ${CHATBOT_HOST:-chatbot.localhost}
+      SMS_HOST: ${SMS_HOST:-sms.localhost}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+    depends_on:
+      client:
+        condition: service_started
+      admin:
+        condition: service_started
+      backend:
+        condition: service_started
+      chatbot:
+        condition: service_started
+      smsdev:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: ecommerce-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ecommerce_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data.sql:/docker-entrypoint-initdb.d/01-data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce-redis
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  smsdev:
+    build:
+      context: ./server/tools/smsdev
+    container_name: ecommerce-smsdev
+    environment:
+      SMSDEV_PUBLIC_API_URL: ${SMSDEV_PUBLIC_API_URL:-http://localhost:4001}
+    ports:
+      - "${SMSDEV_UI_PORT:-4000}:4000"
+      - "${SMSDEV_API_PORT:-4001}:4001"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    container_name: ecommerce-backend
+    environment:
+      SERVER_PORT: 8888
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-ecommerce_db}
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      SMSDEV_BASE_URL: http://smsdev:4001
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost,http://admin.localhost,http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173}
+      GHN_BASE_URL: ${GHN_BASE_URL:-https://dev-online-gateway.ghn.vn}
+      GHN_TOKEN: ${GHN_TOKEN:-}
+      GHN_SHOP_ID: ${GHN_SHOP_ID:-}
+      SEPAY_ENABLED: ${SEPAY_ENABLED:-true}
+      SEPAY_BASE_URL: ${SEPAY_BASE_URL:-https://my.dev.sepay.vn}
+      SEPAY_API_TOKEN: ${SEPAY_API_TOKEN:-}
+      SEPAY_BANK_ACCOUNT_NUMBER: ${SEPAY_BANK_ACCOUNT_NUMBER:-}
+      SEPAY_BANK_BIN: ${SEPAY_BANK_BIN:-}
+      SEPAY_BANK_CODE: ${SEPAY_BANK_CODE:-MBBank}
+      SEPAY_WEBHOOK_SECRET: ${SEPAY_WEBHOOK_SECRET:-}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:-}
+      R2_SECRET_KEY: ${R2_SECRET_KEY:-}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-}
+      R2_PUBLIC_URL: ${R2_PUBLIC_URL:-}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change-me-access-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change-me-refresh-secret}
+    ports:
+      - "${API_PORT:-8888}:8888"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      smsdev:
+        condition: service_started
+    restart: unless-stopped
+
+  chatbot:
+    build:
+      context: ./chatbot
+    container_name: ecommerce-chatbot
+    environment:
+      ECOMMERCE_API_BASE_URL: http://backend:8888/api/v1
+      SQLITE_PATH: /app/data/chatbot.sqlite3
+      CHROMA_PERSIST_DIR: /app/data/chroma
+      CHROMA_COLLECTION: ${CHROMA_COLLECTION:-bagy_documents}
+      CHATBOT_CORS_ORIGINS: ${CHATBOT_CORS_ORIGINS:-http://localhost,http://localhost:3000,http://127.0.0.1:3000}
+      NVIDIA_BASE_URL: ${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      NVIDIA_LLM_MODELS: ${NVIDIA_LLM_MODELS:-mistralai/mistral-nemotron}
+      NVIDIA_EMBEDDING_MODEL: ${NVIDIA_EMBEDDING_MODEL:-nvidia/llama-nemotron-embed-1b-v2}
+      NVIDIA_RERANK_MODEL: ${NVIDIA_RERANK_MODEL:-nvidia/llama-nemotron-rerank-1b-v2}
+      NVIDIA_RERANK_URL: ${NVIDIA_RERANK_URL:-https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-nemotron-rerank-1b-v2/reranking}
+      RETRIEVAL_PROVIDER: ${RETRIEVAL_PROVIDER:-nvidia}
+      RERANK_ENABLED: ${RERANK_ENABLED:-true}
+      REDIS_URL: redis://redis:6379/1
+    ports:
+      - "${CHATBOT_PORT:-8000}:8000"
+    volumes:
+      - ./chatbot/data:/app/data
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api/v1}
+        NEXT_PUBLIC_CHATBOT_API_URL: ${NEXT_PUBLIC_CHATBOT_API_URL:-http://localhost/chatbot-api/v1}
+    container_name: ecommerce-client
+    ports:
+      - "${CLIENT_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_started
+      chatbot:
+        condition: service_started
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: ./admin
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost/api/v1}
+    container_name: ecommerce-admin
+    ports:
+      - "${ADMIN_PORT:-5173}:80"
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
+  redis-insight:
+    image: redis/redisinsight:latest
+    container_name: ecommerce-redis-ui
+    profiles: ["tools"]
+    ports:
+      - "127.0.0.1:${REDIS_INSIGHT_PORT:-5540}:5540"
+    volumes:
+      - redis_insight_data:/db
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  redis_insight_data:

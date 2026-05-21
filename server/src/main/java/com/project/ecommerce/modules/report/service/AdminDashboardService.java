@@ -9,6 +9,7 @@ import com.project.ecommerce.modules.order.repository.OrderRepository;
 import com.project.ecommerce.modules.payment.entity.PaymentTransaction;
 import com.project.ecommerce.modules.payment.enums.PaymentProvider;
 import com.project.ecommerce.modules.payment.repository.PaymentTransactionRepository;
+import com.project.ecommerce.modules.product.projection.LowStockProductSummary;
 import com.project.ecommerce.modules.product.repository.CategoryRepository;
 import com.project.ecommerce.modules.product.repository.ProductRepository;
 import com.project.ecommerce.modules.product.repository.ProductVariantRepository;
@@ -55,7 +56,7 @@ public class AdminDashboardService {
         boolean canViewCategories = hasAuthority(authentication, "CATEGORY:VIEW");
         boolean canViewCustomers = hasAuthority(authentication, "USER:VIEW");
 
-        List<ProductVariantRepository.LowStockProductSummary> lowStockProducts = canViewProducts
+        List<LowStockProductSummary> lowStockProducts = canViewProducts
                 ? productVariantRepository.findLowStockProductSummaries(LOW_STOCK_THRESHOLD)
                 : Collections.emptyList();
 
@@ -75,7 +76,7 @@ public class AdminDashboardService {
             boolean canViewProducts,
             boolean canViewCategories,
             boolean canViewCustomers,
-            List<ProductVariantRepository.LowStockProductSummary> lowStockProducts) {
+            List<LowStockProductSummary> lowStockProducts) {
         return AdminDashboardMetricsResponse.builder()
                 .totalOrders(canViewOrders ? orderRepository.count() : 0)
                 .processingOrders(canViewOrders ? orderRepository.countByStatusIn(List.of(
@@ -197,7 +198,7 @@ public class AdminDashboardService {
                 .toList();
     }
 
-    private List<AdminDashboardStockAlertResponse> buildStockAlerts(List<ProductVariantRepository.LowStockProductSummary> lowStockProducts) {
+    private List<AdminDashboardStockAlertResponse> buildStockAlerts(List<LowStockProductSummary> lowStockProducts) {
         return lowStockProducts.stream()
                 .limit(5)
                 .map(product -> AdminDashboardStockAlertResponse.builder()

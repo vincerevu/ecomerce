@@ -18,6 +18,7 @@ import {
   isOrderPaymentExpired,
 } from "@/libs/sepay";
 import OtpVerificationField from "@/components/Common/OtpVerificationField";
+import { reviewApi } from "@/libs/review-api";
 
 type ProgressStep = {
   key: string;
@@ -56,6 +57,39 @@ const formatDateTime = (value?: string) => {
 };
 
 const formatCurrency = (value?: number) => `${(value ?? 0).toLocaleString("vi-VN")}đ`;
+
+const shipmentStatusLabelMap: Record<string, string> = {
+  CREATED: "Đã tạo vận đơn",
+  READY_TO_PICK: "Chờ lấy hàng",
+  PICKING: "Đang lấy hàng",
+  DELIVERING: "Đang giao hàng",
+  DELIVERED: "Giao hàng thành công",
+  RETURNING: "Đang hoàn hàng",
+  RETURNED: "Đã hoàn hàng",
+  CANCELLED: "Đã hủy vận đơn",
+  FAILED: "Giao hàng thất bại",
+  ready_to_pick: "Chờ lấy hàng",
+  picking: "Đang lấy hàng",
+  delivering: "Đang giao hàng",
+  transporting: "Đang vận chuyển",
+  sorting: "Đang phân loại",
+  delivered: "Giao hàng thành công",
+  return: "Đang hoàn hàng",
+  returning: "Đang hoàn hàng",
+  returned: "Đã hoàn hàng",
+  cancel: "Đã hủy vận đơn",
+  cancelled: "Đã hủy vận đơn",
+  delivery_fail: "Giao hàng thất bại",
+  lost: "Thất lạc hàng",
+  damage: "Hàng bị hư hỏng",
+};
+
+const getShipmentStatusLabel = (status?: string) => {
+  if (!status) {
+    return "";
+  }
+  return shipmentStatusLabelMap[status] || shipmentStatusLabelMap[status.trim()] || status;
+};
 
 const buildProgressSteps = (order: CustomerOrder, shipment: ShipmentDetail | null): ProgressStep[] => {
   const isPaid = order.paymentStatus === "PAID" || order.paymentStatus === "PARTIALLY_PAID";
@@ -174,15 +208,23 @@ const buildTimeline = (order: CustomerOrder, shipment: ShipmentDetail | null): T
     return buildFallbackTimeline(order, shipment);
   }
 
-  return events.map((event, index) => ({
-    key: event.id || `${index}`,
-    title: event.description || event.providerStatus || event.internalStatus || "Cập nhật vận chuyển",
-    description: event.providerStatus && event.internalStatus && event.providerStatus !== event.internalStatus
-      ? `${event.providerStatus} • ${event.internalStatus}`
-      : event.internalStatus,
-    time: event.eventTime,
-    active: index === 0,
-  }));
+  return events.map((event, index) => {
+    const providerLabel = getShipmentStatusLabel(event.providerStatus);
+    const internalLabel = getShipmentStatusLabel(event.internalStatus);
+    const statusDescription =
+      providerLabel && internalLabel && providerLabel !== internalLabel
+        ? `${providerLabel} • ${internalLabel}`
+        : internalLabel || providerLabel;
+    const title = event.description || internalLabel || providerLabel || "Cập nhật vận chuyển";
+
+    return {
+      key: event.id || `${index}`,
+      title,
+      description: statusDescription && statusDescription !== title ? statusDescription : undefined,
+      time: event.eventTime,
+      active: index === 0,
+    };
+  });
 };
 
 const StepIcon = ({ stepKey, active }: { stepKey: string; active: boolean }) => {
@@ -243,6 +285,12 @@ const OrderDetailPage = () => {
   const [isSendingCancelOtp, setIsSendingCancelOtp] = useState(false);
   const [isConfirmingCancel, setIsConfirmingCancel] = useState(false);
   const [cancelOtpSent, setCancelOtpSent] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState<CustomerOrder["items"][number] | null>(null);
+  const [reviewedProductIds, setReviewedProductIds] = useState<Set<string>>(new Set());
+  const [reviewRating, setReviewRating] = useState(5);
+  const [hoveredReviewRating, setHoveredReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   useEffect(() => {
     if (!isAuthLoading && !user) {
@@ -258,9 +306,10 @@ const OrderDetailPage = () => {
     const loadData = async () => {
       try {
         setIsLoading(true);
-        const [orderResult, shipmentResult] = await Promise.allSettled([
+        const [orderResult, shipmentResult, reviewsResult] = await Promise.allSettled([
           orderApi.getById(params.id),
           shippingApi.getByOrderId(params.id),
+          reviewApi.getMineByOrder(params.id),
         ]);
 
         if (orderResult.status !== "fulfilled") {
@@ -275,6 +324,11 @@ const OrderDetailPage = () => {
 
         setOrder(orderData);
         setShipment(shipmentResult.status === "fulfilled" ? shipmentResult.value.result : null);
+        setReviewedProductIds(
+          reviewsResult.status === "fulfilled"
+            ? new Set(reviewsResult.value.result.map((review) => review.productId))
+            : new Set(),
+        );
       } catch {
         router.replace("/my-account/orders");
       } finally {
@@ -436,6 +490,44 @@ const OrderDetailPage = () => {
       toast.error(error?.message || "Không thể hủy đơn hàng.");
     } finally {
       setIsConfirmingCancel(false);
+    }
+  };
+
+  const handleOpenReview = (item: CustomerOrder["items"][number]) => {
+    setReviewTarget(item);
+    setReviewRating(5);
+    setHoveredReviewRating(0);
+    setReviewComment("");
+  };
+
+  const handleSubmitReview = async () => {
+    if (!order?.id || !reviewTarget?.productId) {
+      return;
+    }
+
+    try {
+      setIsSubmittingReview(true);
+      await reviewApi.create({
+        orderId: order.id,
+        productId: reviewTarget.productId,
+        rating: reviewRating,
+        comment: reviewComment,
+      });
+      toast.success("Cảm ơn bạn đã đánh giá sản phẩm.");
+      setReviewedProductIds((prev) => {
+        const next = new Set(prev);
+        next.add(reviewTarget.productId);
+        return next;
+      });
+      setReviewTarget(null);
+      setReviewComment("");
+      setReviewRating(5);
+      setHoveredReviewRating(0);
+    } catch (error: any) {
+      console.error(error);
+      toast.error(error?.message || "Không thể gửi đánh giá.");
+    } finally {
+      setIsSubmittingReview(false);
     }
   };
 
@@ -631,6 +723,16 @@ const OrderDetailPage = () => {
                 <div className="text-left sm:text-right">
                   <p className="text-sm text-dark-4">Đơn giá</p>
                   <p className="mt-1 text-xl font-semibold text-dark">{formatCurrency(item.unitPrice)}</p>
+                  {order.status === "DELIVERED" && item.productId ? (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenReview(item)}
+                      disabled={reviewedProductIds.has(item.productId)}
+                      className="mt-3 rounded-full border border-[#FFC84B] px-4 py-2 text-sm font-semibold text-dark transition hover:bg-[#FFF3D7] disabled:cursor-not-allowed disabled:border-gray-3 disabled:bg-gray-1 disabled:text-dark-4"
+                    >
+                      {reviewedProductIds.has(item.productId) ? "Đã đánh giá" : "Đánh giá"}
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -835,6 +937,89 @@ const OrderDetailPage = () => {
                   className="rounded-full bg-[#E05858] px-5 py-2 text-sm font-semibold text-white transition hover:bg-[#cc4747] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isConfirmingCancel ? "Đang hủy..." : "Xác nhận hủy đơn"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {reviewTarget ? (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-dark/60 px-4 py-8"
+          onClick={() => setReviewTarget(null)}
+        >
+          <div
+            className="relative w-full max-w-[560px] rounded-[28px] bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setReviewTarget(null)}
+              className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full border border-gray-3 text-dark transition hover:bg-gray-1"
+              aria-label="Đóng modal đánh giá"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            <div className="pr-12">
+              <p className="text-2xl font-semibold text-dark">Đánh giá sản phẩm</p>
+              <p className="mt-2 text-base text-dark-4">{reviewTarget.productName}</p>
+            </div>
+
+            <div className="mt-6 space-y-5">
+              <div>
+                <label className="mb-2 block text-sm font-medium text-dark">Số sao</label>
+                <div className="flex gap-2" onMouseLeave={() => setHoveredReviewRating(0)}>
+                  {[1, 2, 3, 4, 5].map((rating) => (
+                    <button
+                      key={rating}
+                      type="button"
+                      onClick={() => setReviewRating(rating)}
+                      onMouseEnter={() => setHoveredReviewRating(rating)}
+                      aria-label={`Chọn ${rating} sao`}
+                      className={`flex h-11 w-11 items-center justify-center text-3xl transition ${
+                        rating <= (hoveredReviewRating || reviewRating)
+                          ? "text-[#F5A400]"
+                          : "text-dark-4 hover:text-[#FFC84B]"
+                      }`}
+                    >
+                      ★
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-medium text-dark">Nhận xét</label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(event) => setReviewComment(event.target.value)}
+                  rows={5}
+                  maxLength={1000}
+                  className="w-full rounded-[20px] border border-gray-3 bg-[#F8FAFD] px-4 py-3 outline-none transition focus:border-[#FFC84B]"
+                  placeholder="Chia sẻ cảm nhận của bạn về chất liệu, form dáng, đóng gói..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setReviewTarget(null)}
+                  className="rounded-full border border-gray-3 px-5 py-2 text-sm font-medium text-dark transition hover:border-gray-4"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleSubmitReview()}
+                  disabled={isSubmittingReview}
+                  className="rounded-full bg-[#FFC84B] px-5 py-2 text-sm font-semibold text-dark transition hover:bg-[#F5BC2E] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isSubmittingReview ? "Đang gửi..." : "Gửi đánh giá"}
                 </button>
               </div>
             </div>

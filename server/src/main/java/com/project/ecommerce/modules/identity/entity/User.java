@@ -40,9 +40,11 @@ public class User extends BaseEntity<String> {
 
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
+    @Builder.Default
     UserType type = UserType.CUSTOMER;
 
     @Column(nullable = false)
+    @Builder.Default
     boolean active = true;
 
     @Enumerated(EnumType.STRING)
@@ -52,9 +54,10 @@ public class User extends BaseEntity<String> {
     LocalDate dateOfBirth;
 
     @OneToMany(mappedBy = "user", cascade = { CascadeType.PERSIST, CascadeType.MERGE }, orphanRemoval = true)
+    @Builder.Default
     private List<Address> addresses = new ArrayList<>();
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     Set<Role> roles;
 
     @ManyToOne(fetch = FetchType.LAZY)

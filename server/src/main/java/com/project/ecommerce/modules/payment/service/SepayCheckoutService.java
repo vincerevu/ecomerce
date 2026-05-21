@@ -6,6 +6,7 @@ import com.project.ecommerce.modules.order.entity.Order;
 import com.project.ecommerce.modules.order.enums.OrderStatus;
 import com.project.ecommerce.modules.order.enums.PaymentStatus;
 import com.project.ecommerce.modules.order.repository.OrderRepository;
+import com.project.ecommerce.modules.order.service.OrderStockService;
 import com.project.ecommerce.modules.payment.config.SepayProperties;
 import com.project.ecommerce.modules.payment.dto.response.PaymentTransactionResponse;
 import com.project.ecommerce.modules.payment.dto.response.SepayCheckoutResponse;
@@ -37,6 +38,7 @@ public class SepayCheckoutService {
 
     private final SepayProperties sepayProperties;
     private final OrderRepository orderRepository;
+    private final OrderStockService orderStockService;
     private final PaymentTransactionService paymentTransactionService;
     private final PaymentTransactionRepository paymentTransactionRepository;
 
@@ -290,7 +292,7 @@ public class SepayCheckoutService {
     }
 
     private Order resolveOrder(String orderId) {
-        return orderRepository.findById(orderId)
+        return orderRepository.findByIdForUpdate(orderId)
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
     }
 
@@ -344,6 +346,7 @@ public class SepayCheckoutService {
     }
 
     private void expireOrderPayment(Order order) {
+        order = resolveOrder(order.getId());
         List<PaymentTransaction> transactions = activeTransactions(order);
         boolean hasChanges = false;
         for (PaymentTransaction transaction : transactions) {
@@ -364,6 +367,7 @@ public class SepayCheckoutService {
 
         if (order.getStatus() != OrderStatus.CANCELLED) {
             order.setStatus(OrderStatus.CANCELLED);
+            orderStockService.releaseStockForCancelledOrder(order);
             hasChanges = true;
         }
 
@@ -375,7 +379,7 @@ public class SepayCheckoutService {
     }
 
     private List<PaymentTransaction> activeTransactions(Order order) {
-        return paymentTransactionRepository.findByOrder(order).stream()
+        return paymentTransactionRepository.findByOrderForUpdate(order).stream()
                 .filter(transaction -> !Boolean.TRUE.equals(transaction.getIsDeleted()))
                 .sorted(Comparator.comparing(
                         PaymentTransaction::getCreatedAt,

@@ -13,6 +13,7 @@ import Button from "../ui/button/Button";
 import ConfirmationModal from "../ui/modal/ConfirmationModal";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
 import { PlusIcon } from "../../icons";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 
 interface CategoryRow {
     id: string;
@@ -29,7 +30,7 @@ interface CategoriesTableProps {
     onCreate?: () => void;
 }
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 type SortPreset = "" | "sortOrderAsc" | "sortOrderDesc" | "nameAsc" | "nameDesc";
 type StructureFilter = "all" | "root" | "child";
 
@@ -80,6 +81,7 @@ export default function CategoriesTable({ onView, onCreate }: CategoriesTablePro
     const [categories, setCategories] = useState<CategoryRow[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useStoredPageSize("admin.categories.pageSize", DEFAULT_PAGE_SIZE);
     const [totalPages, setTotalPages] = useState(1);
     const [totalElements, setTotalElements] = useState(0);
     const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -134,7 +136,7 @@ export default function CategoriesTable({ onView, onCreate }: CategoriesTablePro
 
             const response = await categoryApi.getPage({
                 page: Math.max(0, page - 1),
-                size: PAGE_SIZE,
+                size: pageSize,
                 sort,
                 ...(filter ? { filter } : {}),
             });
@@ -161,7 +163,7 @@ export default function CategoriesTable({ onView, onCreate }: CategoriesTablePro
 
     useEffect(() => {
         void loadPage(currentPage);
-    }, [currentPage, debouncedSearchTerm, sortPreset, structureFilter, parentFilter]);
+    }, [currentPage, debouncedSearchTerm, sortPreset, structureFilter, parentFilter, pageSize]);
 
     const parentOptions = useMemo<Option[]>(() => {
         const roots = categoryOptionsCache
@@ -336,7 +338,12 @@ export default function CategoriesTable({ onView, onCreate }: CategoriesTablePro
                     currentPage={safePage}
                     totalPages={totalPages}
                     onPageChange={setCurrentPage}
-                    summary={totalElements > 0 ? `Hiển thị ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(safePage * PAGE_SIZE, totalElements)} trong ${totalElements} danh mục` : "Không có kết quả"}
+                    pageSize={pageSize}
+                    onPageSizeChange={(nextPageSize) => {
+                        setPageSize(nextPageSize);
+                        setCurrentPage(1);
+                    }}
+                    summary={totalElements > 0 ? `Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, totalElements)} trong ${totalElements} danh mục` : "Không có kết quả"}
                 />
             </div>
 

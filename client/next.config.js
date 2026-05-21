@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    output: "standalone",
     images: {
         remotePatterns: [
             {
@@ -21,6 +22,14 @@ const nextConfig = {
             {
                 protocol: "https",
                 hostname: "**.yodycdn.com",
+            },
+            {
+                protocol: "https",
+                hostname: "**.r2.dev",
+            },
+            {
+                protocol: "https",
+                hostname: "*.r2.cloudflarestorage.com",
             },
             {
                 protocol: "http",

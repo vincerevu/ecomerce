@@ -32,11 +32,22 @@ export interface ProductRow {
   createdAt?: string;
   updatedAt?: string;
   category?: { id: string; name: string };
+  categoryId?: string;
+  categoryName?: string;
+  categorySlug?: string;
+  thumbnailUrl?: string;
+  minOriginalPrice?: number;
+  minSalePrice?: number;
+  displayPrice?: number;
+  displayOriginalPrice?: number;
+  totalStock?: number;
+  variantCount?: number;
   tags?: Array<ProductTag | string>;
   colors: ProductColor[];
 }
 
 export const getTotalStock = (product: ProductRow) =>
+  product.totalStock ??
   product.colors.reduce(
     (colorAcc, color) =>
       colorAcc +
@@ -48,6 +59,10 @@ export const getTotalStock = (product: ProductRow) =>
   );
 
 export const getPriceRange = (product: ProductRow) => {
+  if (product.displayPrice && product.displayPrice > 0) {
+    return { min: product.displayPrice, max: product.displayPrice };
+  }
+
   const prices = product.colors.flatMap(
     (color) => color.variants?.map((variant) => variant.salePrice || 0) || [],
   );
@@ -63,6 +78,7 @@ export const getPriceRange = (product: ProductRow) => {
 };
 
 export const getPrimaryImageUrl = (product: ProductRow) =>
+  product.thumbnailUrl ||
   product.colors.find((color) => color.images?.length)?.images?.[0]?.url;
 
 export const formatPrice = (price: number) =>

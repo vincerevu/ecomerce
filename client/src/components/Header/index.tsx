@@ -6,7 +6,7 @@ import { useSelector } from "react-redux";
 import { selectTotalPrice } from "@/redux/features/cart-slice";
 import { useCartModalContext } from "@/app/context/CartSidebarModalContext";
 import Image from "next/image";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Product } from "@/types/product";
 import { searchProducts } from "@/libs/catalog-api";
 import { useAuth } from "@/app/context/AuthContext";
@@ -22,6 +22,7 @@ const Header = () => {
   const searchParams = useSearchParams();
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const { user } = useAuth();
+  const pathname = usePathname();
 
   const product = useAppSelector((state) => state.cartReducer.items);
   const totalPrice = useSelector(selectTotalPrice);
@@ -105,9 +106,9 @@ const Header = () => {
 
   return (
     <header
-      className={`fixed left-0 top-0 w-full z-9999 bg-white transition-all ease-in-out duration-300 ${
-        stickyMenu && "shadow"
-      }`}
+      className={`fixed left-0 top-0 w-full z-9999 transition-all ease-in-out duration-300 ${
+        pathname === "/" && !stickyMenu ? "bg-transparent" : "bg-white"
+      } ${stickyMenu ? "shadow" : ""}`}
     >
       <div className="max-w-[1170px] mx-auto px-4 sm:px-7.5 xl:px-0">
         <div

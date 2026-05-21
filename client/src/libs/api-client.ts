@@ -42,6 +42,16 @@ const ERROR_MAPPING: Record<number, string> = {
     1037: "Đơn hàng này hiện không thể thanh toán",
     1038: "Đơn hàng đã quá hạn thanh toán",
     1039: "Đơn hàng này hiện không thể hủy",
+    1041: "Không tìm thấy mã giảm giá",
+    1043: "Mã giảm giá chưa được kích hoạt",
+    1044: "Mã giảm giá chưa đến thời gian sử dụng",
+    1045: "Mã giảm giá đã hết hạn",
+    1046: "Mã giảm giá đã hết lượt sử dụng",
+    1047: "Đơn hàng chưa đạt giá trị tối thiểu của mã",
+    1049: "Bạn chỉ có thể đánh giá sản phẩm đã mua và giao thành công",
+    1050: "Bạn đã đánh giá sản phẩm này cho đơn hàng này",
+    1051: "Mã giảm giá không áp dụng cho tài khoản của bạn",
+    1052: "Mã giảm giá chưa được cấu hình đối tượng áp dụng",
 };
 
 apiClient.interceptors.response.use(

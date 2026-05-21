@@ -4,6 +4,11 @@ import apiClient from "../../api/apiClient";
 import Spinner from "../ui/spinner/Spinner";
 import { showError, showSuccess, showWarning } from "../../utils/toast";
 
+interface PresignedUrlResponse {
+    uploadUrl: string;
+    publicUrl: string;
+    fileKey: string;
+}
 
 interface ImageUploadProps {
     value?: string;
@@ -36,28 +41,52 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                     return;
                 }
 
-                const formData = new FormData();
-                formData.append("file", file);
-                formData.append("folder", folder);
-
-                const response = await apiClient.post("/media/upload", formData, {
-                    headers: {
-                        "Content-Type": "multipart/form-data",
+                const contentType = file.type || "application/octet-stream";
+                const response = await apiClient.get<{
+                    code: number;
+                    message?: string;
+                    result?: PresignedUrlResponse;
+                }>("/media/presigned-url", {
+                    params: {
+                        fileName: file.name,
+                        contentType,
+                        folder,
                     },
                 });
 
-                if (response.data.code === 1000) {
-                    onChange(response.data.result.url);
-                } else {
+                if (response.data.code !== 1000 || !response.data.result) {
                     showError(response.data.message || `Lỗi tải ảnh ${file.name}`);
+                    return;
                 }
+
+                const uploadResponse = await fetch(response.data.result.uploadUrl, {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": contentType,
+                    },
+                    body: file,
+                });
+
+                if (!uploadResponse.ok) {
+                    const detail = await uploadResponse.text().catch(() => "");
+                    throw new Error(
+                        detail
+                            ? `Không thể tải ảnh ${file.name}: ${detail}`
+                            : `Không thể tải ảnh ${file.name} lên kho lưu trữ`,
+                    );
+                }
+
+                onChange(response.data.result.publicUrl);
             });
 
             await Promise.all(uploadPromises);
             showSuccess(`Đã tải lên ${acceptedFiles.length} ảnh thành công`);
         } catch (error: any) {
             console.error("Upload error:", error);
-            const msg = error.response?.data?.message || error.message || "Lỗi kết nối server";
+            const msg =
+                error.response?.data?.message ||
+                error.message ||
+                "Không thể tải ảnh. Kiểm tra CORS của Cloudflare R2 bucket.";
             showError(msg);
         } finally {
             setUploading(false);

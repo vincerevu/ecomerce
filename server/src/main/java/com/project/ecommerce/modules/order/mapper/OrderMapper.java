@@ -25,9 +25,10 @@ public interface OrderMapper {
     @Mapping(target = "isDeleted", ignore = true)
     @Mapping(target = "subtotal", ignore = true)
     @Mapping(target = "totalAmount", ignore = true)
+    @Mapping(target = "couponName", ignore = true)
     @Mapping(target = "status", expression = "java(request.getStatus() != null ? request.getStatus() : com.project.ecommerce.modules.order.enums.OrderStatus.PENDING)")
     @Mapping(target = "paymentStatus", expression = "java(request.getPaymentStatus() != null ? request.getPaymentStatus() : com.project.ecommerce.modules.order.enums.PaymentStatus.UNPAID)")
     @Mapping(target = "shippingFee", expression = "java(request.getShippingFee() != null ? request.getShippingFee() : java.math.BigDecimal.ZERO)")
-    @Mapping(target = "discountAmount", expression = "java(request.getDiscountAmount() != null ? request.getDiscountAmount() : java.math.BigDecimal.ZERO)")
+    @Mapping(target = "discountAmount", ignore = true)
     Order toEntity(CreateOrderRequest request);
 }

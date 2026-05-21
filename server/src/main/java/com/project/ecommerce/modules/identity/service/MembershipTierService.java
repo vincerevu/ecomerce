@@ -12,6 +12,8 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,6 +29,7 @@ public class MembershipTierService {
     MembershipTierMapper membershipTierMapper;
 
     @PreAuthorize("hasAuthority('MEMBERSHIP_TIER:CREATE')")
+    @CacheEvict(value = "membership_tiers", allEntries = true)
     public MembershipTierResponse createMembershipTier(CreateMembershipTierRequest request) {
         if (membershipTierRepository.findByTierName(request.getTierName()).isPresent()) {
             throw new AppException(ErrorCode.INVALID_KEY);
@@ -36,6 +39,7 @@ public class MembershipTierService {
     }
 
     @PreAuthorize("hasAuthority('MEMBERSHIP_TIER:VIEW')")
+    @Cacheable(value = "membership_tiers", key = "'all'")
     public List<MembershipTierResponse> getAllMembershipTiers() {
         return membershipTierRepository.findAll()
                 .stream()
@@ -44,6 +48,7 @@ public class MembershipTierService {
     }
 
     @PreAuthorize("hasAuthority('MEMBERSHIP_TIER:VIEW')")
+    @Cacheable(value = "membership_tiers", key = "'id_' + #id")
     public MembershipTierResponse getMembershipTierById(String id) {
         MembershipTier tier = membershipTierRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -51,6 +56,7 @@ public class MembershipTierService {
     }
 
     @PreAuthorize("hasAuthority('MEMBERSHIP_TIER:UPDATE')")
+    @CacheEvict(value = "membership_tiers", allEntries = true)
     public MembershipTierResponse updateMembershipTier(String id, UpdateMembershipTierRequest request) {
         MembershipTier tier = membershipTierRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));
@@ -62,6 +68,7 @@ public class MembershipTierService {
 
     @Transactional
     @PreAuthorize("hasAuthority('MEMBERSHIP_TIER:DELETE')")
+    @CacheEvict(value = "membership_tiers", allEntries = true)
     public void deleteMembershipTier(String id) {
         MembershipTier tier = membershipTierRepository.findById(id)
                 .orElseThrow(() -> new AppException(ErrorCode.RESOURCE_NOT_FOUND));

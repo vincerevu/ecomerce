@@ -17,6 +17,7 @@ import {
   OrderResponse,
   SepayCheckoutResponse,
 } from "@/libs/checkout-api";
+import { couponApi, CouponValidationResult } from "@/libs/coupon-api";
 import { buildSepayQrImageUrl } from "@/libs/sepay";
 import {
   shippingApi,
@@ -102,6 +103,11 @@ const Checkout = () => {
   const [wardCode, setWardCode] = useState("");
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"COD" | "SEPAY">("COD");
+  const [couponInput, setCouponInput] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponValidationResult | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<CouponValidationResult[]>([]);
+  const [isLoadingCoupons, setIsLoadingCoupons] = useState(false);
+  const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
 
   const [createdOrder, setCreatedOrder] = useState<OrderResponse | null>(null);
   const [sepayCheckout, setSepayCheckout] = useState<SepayCheckoutResponse | null>(null);
@@ -120,7 +126,8 @@ const Checkout = () => {
     districts.find((item) => item.code === districtCode) || null;
   const selectedWard = wards.find((item) => item.code === wardCode) || null;
   const currentShippingFee = shippingFee?.total || 0;
-  const totalAmount = subtotal + currentShippingFee;
+  const discountAmount = appliedCoupon?.discountAmount || 0;
+  const totalAmount = Math.max(subtotal + currentShippingFee - discountAmount, 0);
   const displayedSepayAmount =
     createdOrder?.totalAmount ??
     (subtotal + (createdOrder ? createdOrder.shippingFee : currentShippingFee));
@@ -161,6 +168,32 @@ const Checkout = () => {
       router.replace("/cart");
     }
   }, [cartItems.length, isBootstrapping, router]);
+
+  useEffect(() => {
+    setAppliedCoupon(null);
+  }, [paymentMethod, subtotal]);
+
+  useEffect(() => {
+    if (subtotal <= 0) {
+      setAvailableCoupons([]);
+      return;
+    }
+
+    const loadAvailableCoupons = async () => {
+      try {
+        setIsLoadingCoupons(true);
+        const response = await couponApi.getAvailable(subtotal, paymentMethod);
+        setAvailableCoupons(response.result || []);
+      } catch (error) {
+        console.error(error);
+        setAvailableCoupons([]);
+      } finally {
+        setIsLoadingCoupons(false);
+      }
+    };
+
+    void loadAvailableCoupons();
+  }, [paymentMethod, subtotal]);
 
   useEffect(() => {
     if (!sepayCheckout?.paymentId) {
@@ -320,6 +353,32 @@ const Checkout = () => {
     setWardCode(wardMatch?.code || "");
   };
 
+  const handleApplyCoupon = async (selectedCode?: string) => {
+    const code = (selectedCode || couponInput).trim();
+    if (!code) {
+      toast.error("Vui lòng nhập mã giảm giá.");
+      return;
+    }
+    if (subtotal <= 0) {
+      toast.error("Giỏ hàng chưa có sản phẩm để áp mã.");
+      return;
+    }
+
+    try {
+      setIsApplyingCoupon(true);
+      const response = await couponApi.validate(code, subtotal, paymentMethod);
+      setAppliedCoupon(response.result);
+      setCouponInput(response.result.code);
+      toast.success(`Đã áp dụng ${response.result.code}.`);
+    } catch (error: any) {
+      console.error(error);
+      setAppliedCoupon(null);
+      toast.error(error?.message || "Mã giảm giá không hợp lệ.");
+    } finally {
+      setIsApplyingCoupon(false);
+    }
+  };
+
   const handleSubmit = async () => {
 
     if (cartItems.length === 0) {
@@ -360,7 +419,8 @@ const Checkout = () => {
         shippingWardCode: selectedWard.code,
         notes,
         shippingFee: currentShippingFee,
-        discountAmount: 0,
+        couponCode: appliedCoupon?.code,
+        paymentMethod,
         paymentStatus: paymentMethod === "COD" ? "UNPAID" : "PENDING",
         status: "PENDING",
         items: cartItems.map((item) => ({
@@ -709,6 +769,87 @@ const Checkout = () => {
                           <span>Phí vận chuyển</span>
                           <span>{isEstimatingFee ? "..." : formatCurrency(currentShippingFee)}</span>
                         </div>
+                        <div className="rounded-[18px] border border-gray-3 bg-gray-1 p-3">
+                          <label className="mb-2 block text-sm font-medium text-dark">
+                            Mã giảm giá
+                          </label>
+                          <div className="flex gap-2">
+                            <input
+                              value={couponInput}
+                              onChange={(event) => setCouponInput(event.target.value.toUpperCase())}
+                              placeholder="NHAPMA"
+                              className="min-w-0 flex-1 rounded-full border border-gray-3 bg-white px-4 py-2 text-sm outline-none transition focus:border-blue"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => void handleApplyCoupon()}
+                              disabled={isApplyingCoupon}
+                              className="rounded-full bg-[#FFC84B] px-4 py-2 text-sm font-semibold text-dark transition hover:bg-[#F5BC2E] disabled:cursor-not-allowed disabled:opacity-70"
+                            >
+                              {isApplyingCoupon ? "..." : "Áp dụng"}
+                            </button>
+                          </div>
+                          <div className="mt-3">
+                            <div className="mb-2 flex items-center justify-between gap-3">
+                              <span className="text-xs font-medium uppercase tracking-wide text-dark-4">
+                                Mã có thể dùng
+                              </span>
+                              {isLoadingCoupons ? (
+                                <span className="text-xs text-dark-4">Đang tải...</span>
+                              ) : null}
+                            </div>
+                            {availableCoupons.length > 0 ? (
+                              <div className="space-y-2">
+                                {availableCoupons.map((coupon) => {
+                                  const isSelected = appliedCoupon?.code === coupon.code;
+                                  return (
+                                    <button
+                                      key={coupon.couponId}
+                                      type="button"
+                                      onClick={() => void handleApplyCoupon(coupon.code)}
+                                      disabled={isApplyingCoupon}
+                                      className={`flex w-full items-center justify-between gap-3 rounded-2xl border bg-white px-3 py-2 text-left transition ${
+                                        isSelected
+                                          ? "border-[#FFC84B] bg-[#FFF7DF]"
+                                          : "border-gray-3 hover:border-[#FFC84B]"
+                                      } disabled:cursor-not-allowed disabled:opacity-70`}
+                                    >
+                                      <span className="min-w-0">
+                                        <span className="block text-sm font-semibold text-dark">{coupon.code}</span>
+                                        <span className="block truncate text-xs text-dark-4">{coupon.name}</span>
+                                      </span>
+                                      <span className="shrink-0 text-sm font-semibold text-[#2EBA5A]">
+                                        -{formatCurrency(coupon.discountAmount)}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : !isLoadingCoupons ? (
+                              <p className="rounded-2xl border border-dashed border-gray-3 bg-white px-3 py-2 text-xs text-dark-4">
+                                Chưa có mã phù hợp với giỏ hàng hiện tại.
+                              </p>
+                            ) : null}
+                          </div>
+                          {appliedCoupon ? (
+                            <div className="mt-3 flex items-center justify-between gap-3 text-sm">
+                              <span className="text-[#2EBA5A]">{appliedCoupon.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => setAppliedCoupon(null)}
+                                className="font-medium text-dark-4 hover:text-dark"
+                              >
+                                Bỏ mã
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                        {discountAmount > 0 ? (
+                          <div className="flex items-center justify-between text-[#2EBA5A]">
+                            <span>Giảm giá</span>
+                            <span>-{formatCurrency(discountAmount)}</span>
+                          </div>
+                        ) : null}
                         <div className="flex items-center justify-between border-t border-gray-3 pt-3 text-lg font-semibold text-dark">
                           <span>Tổng cộng</span>
                           <span>{formatCurrency(totalAmount)}</span>

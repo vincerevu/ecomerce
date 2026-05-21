@@ -47,6 +47,14 @@ const ERROR_MAPPING: Record<number, string> = {
   1025: "Không tìm thấy biến thể sản phẩm",
   1026: "Không tìm thấy giao dịch thanh toán",
   1027: "Mã giao dịch thanh toán đã tồn tại",
+  1041: "Không tìm thấy mã giảm giá",
+  1042: "Mã giảm giá đã tồn tại",
+  1043: "Mã giảm giá chưa được kích hoạt",
+  1045: "Mã giảm giá đã hết hạn",
+  1051: "Mã giảm giá không áp dụng cho khách hàng này",
+  1052: "Vui lòng chọn đối tượng áp dụng mã giảm giá",
+  1048: "Không tìm thấy đánh giá",
+  1050: "Đánh giá đã tồn tại",
 };
 
 apiClient.interceptors.response.use(

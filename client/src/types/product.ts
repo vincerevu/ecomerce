@@ -78,8 +78,8 @@ export type ProductColorResponse = {
   id: string;
   colorName: string;
   hexCode: string;
-  images: ProductImageResponse[];
-  variants: ProductVariantResponse[];
+  images?: ProductImageResponse[];
+  variants?: ProductVariantResponse[];
 };
 
 export type ProductCategoryResponse = {
@@ -107,6 +107,16 @@ export type ProductResponse = {
   createdAt?: string;
   updatedAt?: string;
   category?: ProductCategoryResponse | null;
+  categoryId?: string;
+  categoryName?: string;
+  categorySlug?: string;
+  thumbnailUrl?: string;
+  minOriginalPrice?: number | string;
+  minSalePrice?: number | string;
+  displayPrice?: number | string;
+  displayOriginalPrice?: number | string;
+  totalStock?: number;
+  variantCount?: number;
   colors?: ProductColorResponse[];
   tags?: Array<{ id: string; name: string }>;
   status?: string;
@@ -167,6 +177,8 @@ export const normalizeProduct = (product: ProductResponse): Product => {
 
   const allImages = colors.flatMap((color) => color.images).filter(Boolean);
   const allVariants = colors.flatMap((color) => color.variants);
+  const listDisplayPrice = toNumber(product.displayPrice ?? product.minSalePrice);
+  const listOriginalPrice = toNumber(product.displayOriginalPrice ?? product.minOriginalPrice);
   const salePrices = allVariants
     .map((variant) => variant.salePrice || variant.originalPrice)
     .filter((price) => price > 0);
@@ -175,19 +187,27 @@ export const normalizeProduct = (product: ProductResponse): Product => {
     .filter((price) => price > 0);
 
   const discountedPrice =
-    salePrices.length > 0 ? Math.min(...salePrices) : 0;
+    listDisplayPrice > 0
+      ? listDisplayPrice
+      : salePrices.length > 0
+        ? Math.min(...salePrices)
+        : 0;
   const price =
-    originalPrices.length > 0
+    listOriginalPrice > 0
+      ? listOriginalPrice
+      : originalPrices.length > 0
       ? Math.max(...originalPrices)
       : discountedPrice;
-  const totalStock = allVariants.reduce(
-    (sum, variant) => sum + (variant.stockQuantity || 0),
-    0
-  );
+  const totalStock =
+    product.totalStock ??
+    allVariants.reduce(
+      (sum, variant) => sum + (variant.stockQuantity || 0),
+      0
+    );
   const imageSet =
     allImages.length > 0
       ? allImages
-      : [PRODUCT_PLACEHOLDER];
+      : [sanitizeProductImageUrl(product.thumbnailUrl)];
 
   return {
     id: product.id,
@@ -197,9 +217,9 @@ export const normalizeProduct = (product: ProductResponse): Product => {
     description: product.description || "",
     shortDescription: product.shortDescription || "",
     material: product.material || "",
-    categoryId: product.category?.id || "",
-    categoryName: product.category?.name || "Chưa phân loại",
-    categorySlug: product.category?.slug || "",
+    categoryId: product.category?.id || product.categoryId || "",
+    categoryName: product.category?.name || product.categoryName || "Chưa phân loại",
+    categorySlug: product.category?.slug || product.categorySlug || "",
     reviews: 0,
     price,
     discountedPrice,

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { inventoryApi, type InventoryStockRecord, type StockImportReceiptRecord } from "../../api/inventoryApi";
 import { useAuth } from "../../context/AuthContext";
 import { PlusIcon } from "../../icons";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 import { showError, showSuccess } from "../../utils/toast";
 import { hasAnyPermission } from "../auth/PermissionGuard";
 import Loader from "../common/Loader";
@@ -19,7 +20,7 @@ import {
   type InventorySortPreset,
 } from "./inventoryTable.utils";
 
-const PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 const STOCK_FILTER_OPTIONS: Option[] = [
   { value: "", label: "Tất cả tồn kho" },
@@ -76,6 +77,7 @@ export default function InventoryTable() {
   const [stockFilter, setStockFilter] = useState("");
   const [sortPreset, setSortPreset] = useState<InventorySortPreset>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useStoredPageSize("admin.inventory.pageSize", DEFAULT_PAGE_SIZE);
   const [totalPages, setTotalPages] = useState(1);
   const [totalElements, setTotalElements] = useState(0);
 
@@ -111,7 +113,7 @@ export default function InventoryTable() {
 
       const stockResponse = await inventoryApi.getStocks({
         page: Math.max(0, page - 1),
-        size: PAGE_SIZE,
+        size: pageSize,
         sort,
         ...(filter ? { filter } : {}),
       });
@@ -146,11 +148,11 @@ export default function InventoryTable() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [debouncedSearchTerm, stockFilter, sortPreset]);
+  }, [debouncedSearchTerm, stockFilter, sortPreset, pageSize]);
 
   useEffect(() => {
     void loadStocks(currentPage);
-  }, [currentPage, debouncedSearchTerm, stockFilter, sortPreset]);
+  }, [currentPage, debouncedSearchTerm, stockFilter, sortPreset, pageSize]);
 
   const safePage = Math.min(currentPage, totalPages);
   const hasFilters = Boolean(searchTerm || stockFilter);
@@ -319,10 +321,15 @@ export default function InventoryTable() {
           currentPage={safePage}
           totalPages={totalPages}
           onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) => {
+            setPageSize(nextPageSize);
+            setCurrentPage(1);
+          }}
           summary={
             totalElements > 0
-              ? `Hiển thị ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(
-                  safePage * PAGE_SIZE,
+              ? `Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(
+                  safePage * pageSize,
                   totalElements,
                 )} trong ${totalElements} biến thể`
               : "Không có kết quả"

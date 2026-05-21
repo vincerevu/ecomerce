@@ -1,10 +1,14 @@
 import { AngleLeftIcon, AngleRightIcon } from "../../icons";
+import Select from "../form/Select";
 
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   summary?: string;
+  pageSize?: number;
+  pageSizeOptions?: number[];
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 function getVisiblePages(currentPage: number, totalPages: number) {
@@ -28,6 +32,9 @@ export default function Pagination({
   totalPages,
   onPageChange,
   summary,
+  pageSize,
+  pageSizeOptions = [5, 8, 10, 20, 50],
+  onPageSizeChange,
 }: PaginationProps) {
   const safeTotalPages = Math.max(1, totalPages);
   const safePage = Math.min(Math.max(1, currentPage), safeTotalPages);
@@ -35,48 +42,66 @@ export default function Pagination({
   return (
     <div className="flex flex-col items-center justify-between gap-3 border-t border-gray-100 px-5 py-4 dark:border-white/[0.05] sm:flex-row">
       <p className="text-sm text-gray-500 dark:text-gray-400">{summary || "Không có kết quả"}</p>
-      <div className="flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => onPageChange(Math.max(1, safePage - 1))}
-          disabled={safePage === 1}
-          aria-label="Trang trước"
-        >
-          <AngleLeftIcon className="h-4 w-4" />
-        </button>
-        {getVisiblePages(safePage, safeTotalPages).map((pageNumber, index) =>
-          pageNumber === -1 ? (
-            <span
-              key={`ellipsis-${index}`}
-              className="flex h-8 w-8 items-center justify-center text-sm font-medium text-gray-300 dark:text-gray-600"
-            >
-              ...
-            </span>
-          ) : (
-            <button
-              key={pageNumber}
-              type="button"
-              onClick={() => onPageChange(pageNumber)}
-              className={`h-8 min-w-8 rounded-lg border px-2 text-sm font-medium transition-colors ${
-                pageNumber === safePage
-                  ? "border-brand-500 bg-brand-500 text-white"
-                  : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.03]"
-              }`}
-              aria-current={pageNumber === safePage ? "page" : undefined}
-            >
-              {pageNumber}
-            </button>
-          ),
-        )}
-        <button
-          type="button"
-          onClick={() => onPageChange(Math.min(safeTotalPages, safePage + 1))}
-          disabled={safePage === safeTotalPages}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 dark:border-gray-700 dark:hover:bg-white/[0.03]"
-          aria-label="Trang sau"
-        >
-          <AngleRightIcon className="h-4 w-4" />
-        </button>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {pageSize && onPageSizeChange ? (
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <span>Hiển thị</span>
+            <Select
+              value={String(pageSize)}
+              onChange={(value) => onPageSizeChange(Number(value))}
+              options={pageSizeOptions.map((option) => ({
+                value: String(option),
+                label: String(option),
+              }))}
+              className="w-[86px]"
+              menuPlacement="top"
+            />
+          </div>
+        ) : null}
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.max(1, safePage - 1))}
+            disabled={safePage === 1}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 dark:border-gray-700 dark:hover:bg-white/[0.03]"
+            aria-label="Trang trước"
+          >
+            <AngleLeftIcon className="h-4 w-4" />
+          </button>
+          {getVisiblePages(safePage, safeTotalPages).map((pageNumber, index) =>
+            pageNumber === -1 ? (
+              <span
+                key={`ellipsis-${index}`}
+                className="flex h-8 w-8 items-center justify-center text-sm font-medium text-gray-300 dark:text-gray-600"
+              >
+                ...
+              </span>
+            ) : (
+              <button
+                key={pageNumber}
+                type="button"
+                onClick={() => onPageChange(pageNumber)}
+                className={`h-8 min-w-8 rounded-lg border px-2 text-sm font-medium transition-colors ${
+                  pageNumber === safePage
+                    ? "border-brand-500 bg-brand-500 text-white"
+                    : "border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.03]"
+                }`}
+                aria-current={pageNumber === safePage ? "page" : undefined}
+              >
+                {pageNumber}
+              </button>
+            ),
+          )}
+          <button
+            type="button"
+            onClick={() => onPageChange(Math.min(safeTotalPages, safePage + 1))}
+            disabled={safePage === safeTotalPages}
+            className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50 disabled:cursor-default disabled:opacity-40 dark:border-gray-700 dark:hover:bg-white/[0.03]"
+            aria-label="Trang sau"
+          >
+            <AngleRightIcon className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -7,11 +7,14 @@ import com.project.ecommerce.modules.identity.entity.User;
 import com.project.ecommerce.modules.identity.repository.UserRepository;
 import com.project.ecommerce.modules.identity.service.AuthenticationService;
 import com.project.ecommerce.modules.identity.service.PointHistoryService;
+import com.project.ecommerce.modules.marketing.dto.response.CouponValidationResponse;
+import com.project.ecommerce.modules.marketing.service.CouponService;
 import com.project.ecommerce.modules.order.dto.request.ConfirmOrderCancelRequest;
 import com.project.ecommerce.modules.order.dto.request.CreateOrderRequest;
 import com.project.ecommerce.modules.order.dto.request.OrderItemRequest;
 import com.project.ecommerce.modules.order.dto.request.UpdateOrderReceiverRequest;
 import com.project.ecommerce.modules.order.dto.request.UpdateOrderStatusRequest;
+import com.project.ecommerce.modules.order.dto.response.OrderListResponse;
 import com.project.ecommerce.modules.order.dto.response.OrderResponse;
 import com.project.ecommerce.modules.order.entity.Order;
 import com.project.ecommerce.modules.order.entity.OrderItem;
@@ -19,6 +22,8 @@ import com.project.ecommerce.modules.order.enums.OrderStatus;
 import com.project.ecommerce.modules.order.enums.PaymentStatus;
 import com.project.ecommerce.modules.order.mapper.OrderItemMapper;
 import com.project.ecommerce.modules.order.mapper.OrderMapper;
+import com.project.ecommerce.modules.order.projection.OrderItemCountView;
+import com.project.ecommerce.modules.order.projection.OrderUserView;
 import com.project.ecommerce.modules.order.repository.OrderRepository;
 import com.project.ecommerce.modules.payment.service.PaymentTransactionService;
 import com.project.ecommerce.modules.product.entity.ProductColor;
@@ -35,6 +40,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -60,6 +67,8 @@ public class OrderService {
     private final PointHistoryService pointHistoryService;
     private final AuthenticationService authenticationService;
     private final PaymentTransactionService paymentTransactionService;
+    private final CouponService couponService;
+    private final OrderStockService orderStockService;
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
 
@@ -68,22 +77,24 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('ORDER:VIEW')")
-    public PageResponse<OrderResponse> getOrders(Pageable pageable, Specification<Order> spec) {
+    public PageResponse<OrderListResponse> getOrders(Pageable pageable, Specification<Order> spec) {
         Page<Order> orderPage = orderRepository.findAll(spec, pageable);
-        return PageResponse.<OrderResponse>builder()
+        List<OrderListResponse> orders = buildOrderListResponses(orderPage.getContent());
+        return PageResponse.<OrderListResponse>builder()
                 .currentPage(pageable.getPageNumber())
                 .pageSize(pageable.getPageSize())
                 .totalPages(orderPage.getTotalPages())
                 .totalElements(orderPage.getTotalElements())
                 .last(orderPage.isLast())
-                .data(orderPage.getContent().stream().map(orderMapper::toResponse).toList())
+                .data(orders)
                 .build();
     }
 
     @Transactional(readOnly = true)
     @PreAuthorize("hasAuthority('ORDER:VIEW')")
     public OrderResponse getOrderById(String id) {
-        return orderMapper.toResponse(findOrThrow(id));
+        return orderMapper.toResponse(orderRepository.findDetailById(id)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND)));
     }
 
     @Transactional
@@ -105,18 +116,23 @@ public class OrderService {
         order.setOrderCode(resolveOrderCode(request.getOrderCode()));
         order.setUser(resolveUser(resolvedUserId));
         applyItems(order, request.getItems());
-        recalculateTotals(order);
-        return orderMapper.toResponse(orderRepository.save(order));
+        recalculateTotals(order, request.getCouponCode(), request.getPaymentMethod());
+        Order savedOrder = orderRepository.save(order);
+        orderStockService.reserveStockForOrder(savedOrder);
+        return orderMapper.toResponse(savedOrder);
     }
 
     @Transactional
     @PreAuthorize("hasAuthority('ORDER:UPDATE')")
     public OrderResponse updateStatus(String id, UpdateOrderStatusRequest request) {
-        Order order = findOrThrow(id);
+        Order order = findForUpdate(id);
         OrderStatus previousStatus = order.getStatus();
         order.setStatus(request.getStatus());
         if (request.getPaymentStatus() != null) {
             order.setPaymentStatus(request.getPaymentStatus());
+        }
+        if (previousStatus != OrderStatus.CANCELLED && order.getStatus() == OrderStatus.CANCELLED) {
+            orderStockService.releaseStockForCancelledOrder(order);
         }
         Order savedOrder = orderRepository.save(order);
         if (previousStatus != OrderStatus.CONFIRMED
@@ -159,11 +175,12 @@ public class OrderService {
 
     @Transactional
     public OrderResponse confirmCancel(String orderId, String userId, ConfirmOrderCancelRequest request) {
-        Order order = findOwnedOrder(orderId, userId);
+        Order order = findOwnedOrderForUpdate(orderId, userId);
         ensureOrderCanBeCancelled(order);
         authenticationService.verifyOrderCancelOtp(order.getCustomerPhone(), request.getOtp());
 
         order.setStatus(OrderStatus.CANCELLED);
+        orderStockService.releaseStockForCancelledOrder(order);
         paymentTransactionService.failOpenChargeTransactions(order, "Order cancelled by customer via OTP");
         return orderMapper.toResponse(orderRepository.save(order));
     }
@@ -173,13 +190,78 @@ public class OrderService {
                 .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
     }
 
+    private Order findForUpdate(String id) {
+        return orderRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new AppException(ErrorCode.ORDER_NOT_FOUND));
+    }
+
+    private List<OrderListResponse> buildOrderListResponses(List<Order> pagedOrders) {
+        if (pagedOrders.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> ids = pagedOrders.stream()
+                .map(Order::getId)
+                .toList();
+
+        Map<String, String> userIdByOrderId = orderRepository.findUserIdsByOrderIds(ids)
+                .stream()
+                .collect(Collectors.toMap(
+                        OrderUserView::getId,
+                        view -> view.getUserId() == null ? "" : view.getUserId()));
+
+        Map<String, Long> itemCountByOrderId = orderRepository.countItemsByOrderIds(ids)
+                .stream()
+                .collect(Collectors.toMap(
+                        OrderItemCountView::getOrderId,
+                        OrderItemCountView::getItemCount));
+
+        return pagedOrders.stream()
+                .map(order -> toOrderListResponse(order, userIdByOrderId, itemCountByOrderId))
+                .toList();
+    }
+
+    private OrderListResponse toOrderListResponse(
+            Order order,
+            Map<String, String> userIdByOrderId,
+            Map<String, Long> itemCountByOrderId) {
+        Long itemCount = itemCountByOrderId.getOrDefault(order.getId(), 0L);
+
+        return OrderListResponse.builder()
+                .id(order.getId())
+                .orderCode(order.getOrderCode())
+                .userId(emptyToNull(userIdByOrderId.get(order.getId())))
+                .customerName(order.getCustomerName())
+                .customerPhone(order.getCustomerPhone())
+                .status(order.getStatus())
+                .paymentStatus(order.getPaymentStatus())
+                .totalAmount(order.getTotalAmount())
+                .itemCount(itemCount.intValue())
+                .createdAt(order.getCreatedAt())
+                .build();
+    }
+
+    private String emptyToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
     private Order findOwnedOrder(String orderId, String userId) {
         Order order = findOrThrow(orderId);
+        validateOrderOwner(order, userId);
+        return order;
+    }
+
+    private Order findOwnedOrderForUpdate(String orderId, String userId) {
+        Order order = findForUpdate(orderId);
+        validateOrderOwner(order, userId);
+        return order;
+    }
+
+    private void validateOrderOwner(Order order, String userId) {
         String ownerId = order.getUser() != null ? order.getUser().getId() : null;
         if (ownerId == null || !ownerId.equals(userId)) {
             throw new AppException(ErrorCode.UNAUTHORIZED);
         }
-        return order;
     }
 
     private User resolveUser(String userId) {
@@ -244,7 +326,8 @@ public class OrderService {
         if (productVariantId == null || productVariantId.isBlank()) {
             return null;
         }
-        return productVariantRepository.findById(productVariantId)
+        return productVariantRepository.findDetailById(productVariantId)
+                .or(() -> productVariantRepository.findById(productVariantId))
                 .orElseThrow(() -> new AppException(ErrorCode.PRODUCT_VARIANT_NOT_FOUND));
     }
 
@@ -262,14 +345,24 @@ public class OrderService {
                 .orElse(null);
     }
 
-    private void recalculateTotals(Order order) {
+    private void recalculateTotals(Order order, String couponCode, String paymentMethod) {
         BigDecimal subtotal = order.getItems().stream()
                 .map(OrderItem::getLineTotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         order.setSubtotal(subtotal);
 
         BigDecimal shippingFee = order.getShippingFee() != null ? order.getShippingFee() : BigDecimal.ZERO;
-        BigDecimal discountAmount = order.getDiscountAmount() != null ? order.getDiscountAmount() : BigDecimal.ZERO;
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        if (StringUtils.hasText(couponCode)) {
+            String couponUserId = order.getUser() != null ? order.getUser().getId() : null;
+            CouponValidationResponse coupon = couponService.claimForOrder(couponCode, subtotal, couponUserId, paymentMethod);
+            discountAmount = coupon.getDiscountAmount();
+            order.setCouponCode(coupon.getCode());
+            order.setCouponName(coupon.getName());
+        } else {
+            order.setCouponCode(null);
+            order.setCouponName(null);
+        }
         order.setShippingFee(shippingFee);
         order.setDiscountAmount(discountAmount);
         order.setTotalAmount(subtotal.add(shippingFee).subtract(discountAmount));
@@ -317,7 +410,7 @@ public class OrderService {
     }
 
     private void updateUserTotalSpent(Order order) {
-        User user = userRepository.findById(order.getUser().getId()).orElse(null);
+        User user = userRepository.findByIdForUpdate(order.getUser().getId()).orElse(null);
         if (user == null) {
             return;
         }

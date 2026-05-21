@@ -11,8 +11,9 @@ import { getCollectionProducts } from "@/libs/collection-api";
 import SectionLoader from "../Common/SectionLoader";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import CustomDropdown from "../Common/CustomDropdown";
+import { PAGE_SIZE_OPTIONS, useStoredPageSize } from "@/hooks/useStoredPageSize";
 
-const PAGE_SIZE = 12;
+const DEFAULT_PAGE_SIZE = 12;
 
 const PRICE_SORT_OPTIONS = [
   { label: "Giá mặc định", value: "" },
@@ -215,11 +216,54 @@ const buildUpdatedSearch = (
   return nextParams.toString();
 };
 
+const getPaginationItems = (currentPage: number, totalPages: number) => {
+  if (totalPages <= 10) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+
+  const pages: (number | string)[] = [];
+
+  const addPage = (page: number) => {
+    if (!pages.includes(page)) {
+      pages.push(page);
+    }
+  };
+
+  for (let i = 1; i <= 4; i++) {
+    addPage(i);
+  }
+
+  if (currentPage <= 6) {
+    for (let i = 5; i <= Math.max(6, currentPage + 1); i++) {
+      addPage(i);
+    }
+    pages.push("...");
+  } else if (currentPage >= totalPages - 5) {
+    pages.push("...");
+    for (let i = Math.min(totalPages - 5, currentPage - 1); i <= totalPages - 4; i++) {
+      addPage(i);
+    }
+  } else {
+    pages.push("...");
+    addPage(currentPage - 1);
+    addPage(currentPage);
+    addPage(currentPage + 1);
+    pages.push("...");
+  }
+
+  for (let i = totalPages - 3; i <= totalPages; i++) {
+    addPage(i);
+  }
+
+  return pages;
+};
+
 const ShopWithSidebar = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
   const catalogParams = useMemo(() => getCatalogParams(searchParams), [searchParams]);
+  const [pageSize, setPageSize] = useStoredPageSize("client.shopWithSidebar.pageSize", DEFAULT_PAGE_SIZE);
 
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -276,11 +320,11 @@ const ShopWithSidebar = () => {
           ? await getCollectionProducts({
               slug: catalogParams.collection,
               page: catalogParams.page - 1,
-              size: PAGE_SIZE,
+              size: pageSize,
             })
           : await getProducts({
               page: catalogParams.page - 1,
-              size: PAGE_SIZE,
+              size: pageSize,
               sort: mapServerSort(catalogParams.sort),
               filter: buildFilter(catalogParams),
               q: catalogParams.q || undefined,
@@ -301,7 +345,7 @@ const ShopWithSidebar = () => {
     };
 
     loadCatalog();
-  }, [catalogParams]);
+  }, [catalogParams, pageSize]);
 
   useEffect(() => {
     if (!isFilterDrawerOpen) {
@@ -353,6 +397,11 @@ const ShopWithSidebar = () => {
   const updateRoute = (updates: Record<string, string | undefined>) => {
     const nextSearch = buildUpdatedSearch(new URLSearchParams(searchParams.toString()), updates);
     router.push(nextSearch ? `${pathname}?${nextSearch}` : pathname);
+  };
+
+  const handlePageSizeChange = (nextValue: string) => {
+    setPageSize(Number(nextValue));
+    updateRoute({ page: undefined });
   };
 
   const toggleSection = (section: string) => {
@@ -640,54 +689,75 @@ const ShopWithSidebar = () => {
                   )}
                 </div>
 
-                <div className="mt-10 flex flex-wrap items-center justify-center gap-2.5">
-                  <button
-                    type="button"
-                    disabled={catalogParams.page === 1}
-                    onClick={() =>
-                      updateRoute({
-                        page:
-                          catalogParams.page > 2
-                            ? String(catalogParams.page - 1)
-                            : undefined,
-                      })
-                    }
-                    className="rounded-full border border-gray-3 bg-white px-4 py-2 text-sm text-dark disabled:opacity-45"
-                  >
-                    Trước
-                  </button>
+                <div className="mt-10 flex flex-col items-center gap-4">
+                  <div className="flex items-center gap-2 text-sm text-dark-4">
+                    <span>Hiển thị</span>
+                    <CustomDropdown
+                      value={String(pageSize)}
+                      onChange={handlePageSizeChange}
+                      options={PAGE_SIZE_OPTIONS.map((option) => ({
+                        label: `${option} sản phẩm`,
+                        value: String(option),
+                      }))}
+                      className="min-w-[132px]"
+                      buttonClassName="rounded-full border-gray-3 px-4 py-2 text-sm"
+                      menuClassName="rounded-2xl p-2"
+                      menuPlacement="top"
+                    />
+                  </div>
 
-                  {Array.from({ length: totalPages }).map((_, index) => (
+                  <div className="flex flex-wrap items-center justify-center gap-2.5">
                     <button
-                      key={index}
                       type="button"
+                      disabled={catalogParams.page === 1}
                       onClick={() =>
                         updateRoute({
-                          page: index === 0 ? undefined : String(index + 1),
+                          page:
+                            catalogParams.page > 2
+                              ? String(catalogParams.page - 1)
+                              : undefined,
                         })
                       }
-                      className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
-                        catalogParams.page === index + 1
-                          ? "bg-yellow text-dark"
-                          : "border border-gray-3 bg-white text-dark hover:border-yellow hover:bg-yellow-light"
-                      }`}
+                      className="rounded-full border border-gray-3 bg-white px-4 py-2 text-sm text-dark disabled:opacity-45"
                     >
-                      {index + 1}
+                      Trước
                     </button>
-                  ))}
 
-                  <button
-                    type="button"
-                    disabled={catalogParams.page === totalPages}
-                    onClick={() =>
-                      updateRoute({
-                        page: String(Math.min(totalPages, catalogParams.page + 1)),
-                      })
-                    }
-                    className="rounded-full border border-gray-3 bg-white px-4 py-2 text-sm text-dark disabled:opacity-45"
-                  >
-                    Sau
-                  </button>
+                    {getPaginationItems(catalogParams.page, totalPages).map((item, index) => (
+                      <button
+                        key={index}
+                        type="button"
+                        disabled={item === "..."}
+                        onClick={() => {
+                          if (typeof item === "number") {
+                            updateRoute({ page: item === 1 ? undefined : String(item) });
+                          }
+                        }}
+                        className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors ${
+                          item === "..."
+                            ? "cursor-default"
+                            : catalogParams.page === item
+                            ? "bg-yellow text-dark"
+                            : "border border-gray-3 bg-white text-dark hover:border-yellow hover:bg-yellow-light"
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    ))}
+
+                    <button
+                      type="button"
+                      disabled={catalogParams.page === totalPages}
+                      onClick={() =>
+                        updateRoute({
+                          page: String(Math.min(totalPages, catalogParams.page + 1)),
+                        })
+                      }
+                      className="rounded-full border border-gray-3 bg-white px-4 py-2 text-sm text-dark disabled:opacity-45"
+                    >
+                      Sau
+                    </button>
+                  </div>
                 </div>
               </>
             )}

@@ -6,6 +6,7 @@ import com.project.ecommerce.modules.order.dto.request.ConfirmOrderCancelRequest
 import com.project.ecommerce.modules.order.dto.request.CreateOrderRequest;
 import com.project.ecommerce.modules.order.dto.request.UpdateOrderReceiverRequest;
 import com.project.ecommerce.modules.order.dto.request.UpdateOrderStatusRequest;
+import com.project.ecommerce.modules.order.dto.response.OrderListResponse;
 import com.project.ecommerce.modules.order.dto.response.OrderResponse;
 import com.project.ecommerce.modules.order.entity.Order;
 import com.project.ecommerce.modules.order.service.OrderService;
@@ -29,10 +30,10 @@ public class OrderController {
 
     @Operation(summary = "Get all orders with dynamic filter + pagination")
     @GetMapping
-    public ApiResponse<PageResponse<OrderResponse>> getOrders(
+    public ApiResponse<PageResponse<OrderListResponse>> getOrders(
             Pageable pageable,
             @Filter Specification<Order> spec) {
-        return ApiResponse.<PageResponse<OrderResponse>>builder()
+        return ApiResponse.<PageResponse<OrderListResponse>>builder()
                 .code(1000).message("Success")
                 .result(orderService.getOrders(pageable, spec))
                 .build();

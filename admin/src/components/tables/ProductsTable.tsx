@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { categoryApi } from "../../api/categoryApi";
 import { productApi } from "../../api/productApi";
 import { useAuth } from "../../context/AuthContext";
+import { useStoredPageSize } from "../../hooks/useStoredPageSize";
 import { EyeIcon, PlusIcon, TrashBinIcon } from "../../icons";
 import { showError, showSuccess } from "../../utils/toast";
 import { hasAnyPermission } from "../auth/PermissionGuard";
@@ -23,7 +24,7 @@ import {
 
 interface ProductsTableProps { onView?: (product: ProductRow) => void; onCreate?: () => void; }
 
-const PAGE_SIZE = 8;
+const DEFAULT_PAGE_SIZE = 8;
 const STATUS_OPTIONS: Option[] = [
     { value: "", label: "Tất cả trạng thái" },
     { value: "ACTIVE", label: "Đang bán" },
@@ -84,6 +85,7 @@ export default function ProductsTable({ onView, onCreate }: ProductsTableProps) 
     const [statusFilter, setStatusFilter] = useState("");
     const [sortPreset, setSortPreset] = useState<ProductSortPreset>("");
     const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useStoredPageSize("admin.products.pageSize", DEFAULT_PAGE_SIZE);
     const [totalPages, setTotalPages] = useState(1);
     const [totalElements, setTotalElements] = useState(0);
     const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -152,7 +154,7 @@ export default function ProductsTable({ onView, onCreate }: ProductsTableProps) 
                     sortPreset === "recentlyUpdated" ? "updatedAt,desc" : "createdAt,desc";
                 const productResponse = await productApi.getAll<ProductRow>({
                     page: Math.max(0, currentPage - 1),
-                    size: PAGE_SIZE,
+                    size: pageSize,
                     sort,
                     ...(filter ? { filter } : {}),
                 });
@@ -174,7 +176,7 @@ export default function ProductsTable({ onView, onCreate }: ProductsTableProps) 
         };
 
         void loadProducts();
-    }, [categoryFilter, currentPage, debouncedSearchTerm, sortPreset, statusFilter]);
+    }, [categoryFilter, currentPage, debouncedSearchTerm, pageSize, sortPreset, statusFilter]);
 
     const safePage = Math.min(currentPage, totalPages);
     const clearFilters = Boolean(searchTerm || categoryFilter || statusFilter);
@@ -203,7 +205,7 @@ export default function ProductsTable({ onView, onCreate }: ProductsTableProps) 
                     sortPreset === "recentlyUpdated" ? "updatedAt,desc" : "createdAt,desc";
                 const productResponse = await productApi.getAll<ProductRow>({
                     page: Math.max(0, currentPage - 1),
-                    size: PAGE_SIZE,
+                    size: pageSize,
                     sort,
                     ...(filter ? { filter } : {}),
                 });
@@ -300,7 +302,7 @@ export default function ProductsTable({ onView, onCreate }: ProductsTableProps) 
                                 products.map((product) => {
                                     const totalStock = getTotalStock(product);
                                     const priceRange = getPriceRange(product);
-                                    const totalVariants = product.colors.flatMap((color) => color.variants || []).length;
+                                    const totalVariants = product.variantCount ?? product.colors.flatMap((color) => color.variants || []).length;
                                     const thumb = getPrimaryImageUrl(product);
                                     return (
                                         <TableRow key={product.id} className="transition-colors hover:bg-gray-50/60 dark:hover:bg-white/[0.02]">
@@ -330,7 +332,7 @@ export default function ProductsTable({ onView, onCreate }: ProductsTableProps) 
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="px-4 py-3.5"><Badge size="sm" color="info" variant="light">{product.category?.name || "N/A"}</Badge></TableCell>
+                                            <TableCell className="px-4 py-3.5"><Badge size="sm" color="info" variant="light">{product.category?.name || product.categoryName || "N/A"}</Badge></TableCell>
                                             <TableCell className="px-4 py-3.5">
                                                 <div className="flex flex-wrap items-center gap-1.5">
                                                     <div className="flex -space-x-1">
@@ -346,6 +348,14 @@ export default function ProductsTable({ onView, onCreate }: ProductsTableProps) 
                                                         {priceRange.min === priceRange.max ? formatPrice(priceRange.min) : `${formatPrice(priceRange.min)} - ${formatPrice(priceRange.max)}`}
                                                     </p>
                                                     {(() => {
+                                                        if (product.displayOriginalPrice && product.displayOriginalPrice > priceRange.min) {
+                                                            return (
+                                                                <p className="mt-1 text-xs text-gray-400 line-through">
+                                                                    {formatPrice(product.displayOriginalPrice)}
+                                                                </p>
+                                                            );
+                                                        }
+
                                                         const originalPrices = product.colors
                                                             .flatMap((color) => color.variants?.map((variant) => variant.originalPrice || 0) || [])
                                                             .filter((price) => price > 0);
@@ -402,7 +412,12 @@ export default function ProductsTable({ onView, onCreate }: ProductsTableProps) 
                     currentPage={safePage}
                     totalPages={totalPages}
                     onPageChange={setCurrentPage}
-                    summary={totalElements > 0 ? `Hiển thị ${(safePage - 1) * PAGE_SIZE + 1}-${Math.min(safePage * PAGE_SIZE, totalElements)} trong ${totalElements} sản phẩm` : "Không có kết quả"}
+                    pageSize={pageSize}
+                    onPageSizeChange={(nextPageSize) => {
+                        setPageSize(nextPageSize);
+                        setCurrentPage(1);
+                    }}
+                    summary={totalElements > 0 ? `Hiển thị ${(safePage - 1) * pageSize + 1}-${Math.min(safePage * pageSize, totalElements)} trong ${totalElements} sản phẩm` : "Không có kết quả"}
                 />
             </div>
 

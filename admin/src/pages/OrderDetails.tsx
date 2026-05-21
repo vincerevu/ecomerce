@@ -349,7 +349,7 @@ export default function OrderDetails() {
                 <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Sản phẩm trong đơn</h4>
               </div>
               <div className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                {order.items.map((item) => (
+                {(order.items || []).map((item) => (
                   <div key={item.id} className="flex items-center gap-3 px-4 py-3">
                     <div className="h-14 w-14 overflow-hidden rounded-2xl bg-gray-100 dark:bg-white/[0.05]">
                       {item.imageUrl ? (
