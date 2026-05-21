@@ -62,7 +62,10 @@ export default function SignInForm() {
         user: LoginUser;
       };
 
-      const hasBackofficeRole = user.roles.some((role) => role.name !== "USER");
+      const ALLOWED_ROLES = ["ADMIN", "MANAGER", "STAFF", "WAREHOUSE_STAFF", "SHIPPER"];
+      const hasBackofficeRole = user.roles.some((role) =>
+        ALLOWED_ROLES.includes(role.name)
+      );
 
       if (!hasBackofficeRole) {
         setError("Truy cập bị từ chối. Chỉ dành cho nhân viên hệ thống.");
