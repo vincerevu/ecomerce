@@ -31,7 +31,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const storedUser = localStorage.getItem("user");
         const token = localStorage.getItem("accessToken");
         if (storedUser && token) {
-            setUser(JSON.parse(storedUser));
+            try {
+                const parsed = JSON.parse(storedUser);
+                // Normalize: đảm bảo roles và permissions luôn là array
+                setUser({
+                    ...parsed,
+                    roles: Array.isArray(parsed.roles) ? parsed.roles : [],
+                    permissions: Array.isArray(parsed.permissions) ? parsed.permissions : [],
+                });
+            } catch {
+                // Data localStorage bị corrupt → xóa và yêu cầu login lại
+                localStorage.removeItem("user");
+                localStorage.removeItem("accessToken");
+                localStorage.removeItem("refreshToken");
+            }
         }
         setIsLoading(false);
     }, []);

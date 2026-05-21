@@ -10,7 +10,7 @@ interface PermissionGuardProps {
 
 /**
  * A component that guards its children based on the user's permissions.
- * 
+ *
  * @param permission - A single permission string or an array of permission strings.
  * @param requireAll - If true, the user must have all specified permissions. If false (default), any one will do.
  * @param children - The elements to render if the user has the required permission(s).
@@ -24,18 +24,22 @@ const PermissionGuard: React.FC<PermissionGuardProps> = ({
 }) => {
     const { user } = useAuth();
 
-    if (!user || !user.permissions) {
+    if (!user) {
         return <>{fallback}</>;
     }
+
+    // Defensive fallback: localStorage cũ có thể thiếu roles/permissions
+    const userRoles: string[] = Array.isArray(user.roles) ? user.roles : [];
+    const userPermissions: string[] = Array.isArray(user.permissions) ? user.permissions : [];
 
     const requiredPermissions = Array.isArray(permission) ? permission : [permission];
 
     const hasPermission = requireAll
-        ? requiredPermissions.every((p) => user.permissions.includes(p))
-        : requiredPermissions.some((p) => user.permissions.includes(p));
+        ? requiredPermissions.every((p) => userPermissions.includes(p))
+        : requiredPermissions.some((p) => userPermissions.includes(p));
 
     // Admin always has all permissions
-    const isAdmin = user.roles.includes("ADMIN");
+    const isAdmin = userRoles.includes("ADMIN");
 
     if (isAdmin || hasPermission) {
         return <>{children}</>;
@@ -50,13 +54,15 @@ export const hasAnyPermission = (
     requireAll = false
 ) => {
     if (!user) return false;
-    if (user.roles.includes("ADMIN")) return true;
+    const userRoles: string[] = Array.isArray(user.roles) ? user.roles : [];
+    const userPermissions: string[] = Array.isArray(user.permissions) ? user.permissions : [];
+    if (userRoles.includes("ADMIN")) return true;
 
     const requiredPermissions = Array.isArray(permission) ? permission : [permission];
 
     return requireAll
-        ? requiredPermissions.every((item) => user.permissions.includes(item))
-        : requiredPermissions.some((item) => user.permissions.includes(item));
+        ? requiredPermissions.every((item) => userPermissions.includes(item))
+        : requiredPermissions.some((item) => userPermissions.includes(item));
 };
 
 export default PermissionGuard;
