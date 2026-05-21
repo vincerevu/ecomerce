@@ -60,7 +60,7 @@ export default function App() {
         reverseOrder={false}
         containerStyle={{ zIndex: 99999 }}
       />
-      <Router>
+      <Router basename="/admin">
         <ScrollToTop />
         <Routes>
           <Route element={<ProtectedRoute />}>
