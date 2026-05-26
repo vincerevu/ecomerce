@@ -59,7 +59,10 @@ class NvidiaChatLLM:
                     last_error = exc
                     continue
 
-        raise LLMError(f"All NVIDIA models failed: {last_error}")
+        return LLMResult(
+            content="Mình đã nhận được câu hỏi. Tuy nhiên, kết nối đến trợ lý AI (NVIDIA API Key) đang bị lỗi (403 Forbidden hoặc hết hạn). Vui lòng kiểm tra hoặc cấu hình lại API Key hợp lệ trên VM.",
+            model="error-fallback",
+        )
 
     async def stream(self, messages: list[dict[str, str]]) -> AsyncIterator[LLMResult]:
         if not self._api_key:
@@ -86,7 +89,12 @@ class NvidiaChatLLM:
                         raise LLMError(f"{model} stream failed after emitting content: {exc}") from exc
                     continue
 
-        raise LLMError(f"All NVIDIA models failed: {last_error}")
+        fallback = (
+            "Mình đã nhận được câu hỏi. Tuy nhiên, kết nối đến trợ lý AI (NVIDIA API Key) đang bị lỗi "
+            "(403 Forbidden hoặc hết hạn). Vui lòng kiểm tra hoặc cấu hình lại API Key hợp lệ trên VM."
+        )
+        for token in fallback.split(" "):
+            yield LLMResult(content=f"{token} ", model="error-fallback")
 
     async def _call_model(self, model: str, messages: list[dict[str, str]]) -> str:
         payload: dict[str, Any] = {
