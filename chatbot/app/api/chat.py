@@ -1,4 +1,5 @@
 import json
+import logging
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, Header
@@ -7,6 +8,8 @@ from fastapi.responses import StreamingResponse
 from app.api.dependencies import get_chat_service
 from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat_service import ChatService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/chat", tags=["chat"])
 
@@ -30,7 +33,8 @@ async def stream_message(
         try:
             async for event in chat_service.stream_answer(request, authorization=authorization):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
-        except Exception:
+        except Exception as e:
+            logger.exception("Error in event_stream")
             error = {
                 "type": "error",
                 "message": "Xin lỗi, hiện mình chưa kết nối được trợ lý tư vấn. Bạn thử lại sau ít phút nhé.",
