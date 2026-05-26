@@ -34,7 +34,8 @@ async def stream_message(
             async for event in chat_service.stream_answer(request, authorization=authorization):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
-            logger.exception("Error in event_stream")
+            import traceback
+            traceback.print_exc()
             error = {
                 "type": "error",
                 "message": "Xin lỗi, hiện mình chưa kết nối được trợ lý tư vấn. Bạn thử lại sau ít phút nhé.",
